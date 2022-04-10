@@ -6,9 +6,11 @@ from time import sleep
 from progress.bar import Bar
 import pandas as pd
 
+import csv
+
 
 DATASET_FILETYPE = "pdf"
-DATASET_SIZE = 10
+DATASET_SIZE = 30_000
 SAMPLE_FILES_PATH = "../govdocs/all_files"
 HASHING_ALGORITHM = "TLSH"
 FRAGMENT_PERCENTAGE = 50
@@ -111,10 +113,17 @@ def overwrite_with_chunk(filepath, fragment, fragment_size_percent):
     return fragment_filepath
 
 
-def generate_dataset_with_simple_anomalies():
+def split_list(a_list):
+    half = len(a_list)//2
+    return a_list[:half], a_list[half:]
+
+def generate_dataset():
 
     #generating a sample_set of files
     sample_files_paths, max_filesize = get_sample_files()
+
+    #dividing the dataset into two parts
+    list_a, normal_files = split_list(sample_files_paths)
 
     #generating a random sequence of bytes
     anomaly = get_rand_bytes(max_filesize)
@@ -124,17 +133,17 @@ def generate_dataset_with_simple_anomalies():
     f.write(anomaly)
     f.close()
 
-    dataset_filepaths = []
+    anomaly_files = []
 
     ctr = 1
-    for path in sample_files_paths:
+    for path in list_a:
         #insert fragments into file
         fragment_filepath = overwrite_with_chunk(path, anomaly, FRAGMENT_PERCENTAGE)
-        dataset_filepaths.append(fragment_filepath)
+        anomaly_files.append(fragment_filepath)
         #print("DATASET GENERATION: {}/{}".format(ctr,DATASET_SIZE))
         ctr += 1
 
-    return dataset_filepaths
+    return anomaly_files, normal_files
 
 def generate_hashes_from_dataset(dataset_paths):
 
@@ -148,20 +157,26 @@ def generate_hashes_from_dataset(dataset_paths):
 
     return hashes
 
+def list_to_csv(list_x, filename):
+    with open(filename, 'w', newline='') as myfile:
+        wr = csv.writer(myfile)
+        wr.writerow(list_x)
+
+
 
 
 if __name__ == '__main__':
 
-    dataset_filepaths = generate_dataset_with_simple_anomalies()
-    hashes = generate_hashes_from_dataset(dataset_filepaths)
-    for i in hashes:
-        print(i)
+    anomaly_files, normal_files = generate_dataset()
+    anomaly_hashes = generate_hashes_from_dataset(anomaly_files)
+    normal_hashes = generate_hashes_from_dataset(normal_files)
+    list_to_csv(anomaly_hashes, "dataset/anomaly_hashes_training_15k_pdf_tlsh.csv")
+    list_to_csv(normal_hashes, "dataset/normal_hashes_training_15k_pdf_tlsh.csv")
 
 
 
-    #hashing a file from the sample set
-    #sample_hash = algorithm_instance.get_hash(sample_files_paths[1])
-    #print(sample_hash)
+
+
 
 
 
