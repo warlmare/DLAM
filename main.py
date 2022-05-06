@@ -10,45 +10,54 @@ import csv
 
 
 DATASET_FILETYPE = "pdf"
-DATASET_SIZE = 30_000
+TRAINING_DATASET_SIZE = 50000
+TEST_DATASET_SIZE = 5000
+TEST_DATA_FILES_PATH = "../napierone"
 SAMPLE_FILES_PATH = "../govdocs/all_files"
-HASHING_ALGORITHM = "TLSH"
+HASHING_ALGORITHM = "SSDEEP"
 FRAGMENT_PERCENTAGE = 50
 
 
-def get_sample_files():
-    '''selects DATASET_SIZE amount of files of DATASET_FILETYPE
+def get_sample_files(tr_dataset_size, filedirectory):
+    '''selects TRAINING_DATASET_SIZE amount of files of DATASET_FILETYPE
 
     :param FILETYPE:
     :return: dict with paths to files
     '''
     filepaths_ext = []
 
-    for file in os.listdir(SAMPLE_FILES_PATH):
+    for file in os.listdir(filedirectory):
         if file.endswith(DATASET_FILETYPE):
-            filepath = os.path.join(SAMPLE_FILES_PATH, file)
+            filepath = os.path.join(filedirectory, file)
             filepaths_ext.append(filepath)
 
 
     filesizes = []
-    sample = random.sample(filepaths_ext, DATASET_SIZE)
+    sample = random.sample(filepaths_ext, tr_dataset_size)
     for file in sample:
         filesizes.append(helper.getfilesize(file) / 1000000) # size in MB
 
 
 
     #converting array to numpy array
-    filesizes = np.asarray(filesizes)
-    dataset_size = np.sum(filesizes)
+    filesizes = np.asarray(filesizes    )   #ataset_size = np.sum(filesizes)
     MAX_FILESIZE = np.max(filesizes) * 1000000
     #print("-" * 50, "FILESIZE DISTRIBUTION IN SAMPLE", "-" * 50)
-    #print(plotille.histogram(filesizes, x_min=0, x_max=MAX_FILESIZE, y_min=0, y_max=DATASET_SIZE/2, X_label="Size in MB"))
-    #print("DATASET SIZE: ", dataset_size, " MB")
+    #print(plotille.histogram(filesizes, x_min=0, x_max=MAX_FILESIZE, y_min=0, y_max=TRAINING_DATASET_SIZE/2, X_label="Size in MB"))
+    #print("DATASET SIZE: ", TRAINING_DATASET_SIZE, " MB")
     #print("-" * 131)
 
 
-    filepaths = random.sample(filepaths_ext, DATASET_SIZE)
-    return filepaths, int(MAX_FILESIZE)
+    filepaths_all = random.sample(filepaths_ext, tr_dataset_size)
+    training_files = random.sample(filepaths_all, tr_dataset_size)
+    # stores the difference of the list for training files and all files
+    #rest_list = []
+
+    #calculate the difference between the files already picked for trainging and all files 
+    # in order to pick only so far un-picked files for testing
+    #rest_list = list(set(filepaths_all) - set(training_files))
+    #test_files = random.sample(rest_list, test_dataset_size)
+    return training_files , int(MAX_FILESIZE)
 
 
 def get_rand_bytes(byte_length: int):
@@ -117,10 +126,10 @@ def split_list(a_list):
     half = len(a_list)//2
     return a_list[:half], a_list[half:]
 
-def generate_dataset():
+def generate_dataset(training_dataset_size, path):
 
     #generating a sample_set of files
-    sample_files_paths, max_filesize = get_sample_files()
+    sample_files_paths, max_filesize = get_sample_files(training_dataset_size, path)
 
     #dividing the dataset into two parts
     list_a, normal_files = split_list(sample_files_paths)
@@ -140,8 +149,10 @@ def generate_dataset():
         #insert fragments into file
         fragment_filepath = overwrite_with_chunk(path, anomaly, FRAGMENT_PERCENTAGE)
         anomaly_files.append(fragment_filepath)
-        #print("DATASET GENERATION: {}/{}".format(ctr,DATASET_SIZE))
+        #print("DATASET GENERATION: {}/{}".format(ctr,TRAINING_DATASET_SIZE))
         ctr += 1
+
+
 
     return anomaly_files, normal_files
 
@@ -167,12 +178,18 @@ def list_to_csv(list_x, filename):
 
 if __name__ == '__main__':
 
-    anomaly_files, normal_files = generate_dataset()
-    anomaly_hashes = generate_hashes_from_dataset(anomaly_files)
-    normal_hashes = generate_hashes_from_dataset(normal_files)
-    list_to_csv(anomaly_hashes, "dataset/anomaly_hashes_training_15k_pdf_tlsh.csv")
-    list_to_csv(normal_hashes, "dataset/normal_hashes_training_15k_pdf_tlsh.csv")
+    training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH)
+    training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
+    training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_training_{}_pdf_ssdeep.csv".format("25k"))
+    list_to_csv(training_normal_hashes, "dataset/normal_hashes_training_{}_pdf_ssdeep.csv".format("25k"))
 
+    
+    test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH)
+    test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
+    test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_test_{}_pdf_ssdeep.csv".format("2500"))
+    list_to_csv(training_normal_hashes, "dataset/normal_hashes_test_{}_pdf_ssdeep.csv".format("2500"))
 
 
 

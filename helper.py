@@ -6,6 +6,7 @@ import importlib
 from pathlib import Path
 import pandas as pd
 import ntpath
+import re
 
 def gettimestring():
     '''gets the current time as %Y%m%d-%H%M%S string
@@ -355,12 +356,21 @@ def get_extensions_in_dir(dir_path)->list:
     return extensions
 
 
+def clean_ssdeep_hash(ssdeep_hash):
+    '''takes a ssdeep hash and removes all unimportant information from a sseep hash
+    like chunksize and the separation-character (:)
 
+    ssdeep formatting: chunksize:chunk:double_chunk
+    
+    :param ssdeep_hash: string 
+    '''
 
+    # remove the first numbers until the :
+    hash_without_chunksize = re.sub(r'^.*?:', ':', ssdeep_hash)
 
+    # remove all :'s
+    hash_without_sep_char = hash_without_chunksize.replace(":","")
 
-
-
-
+    return hash_without_sep_char
 
 
