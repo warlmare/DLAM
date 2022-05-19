@@ -14,7 +14,7 @@ TRAINING_DATASET_SIZE = 50000
 TEST_DATASET_SIZE = 5000
 TEST_DATA_FILES_PATH = "../napierone"
 SAMPLE_FILES_PATH = "../govdocs/all_files"
-HASHING_ALGORITHM = "SSDEEP"
+HASHING_ALGORITHM = "TLSH"
 FRAGMENT_PERCENTAGE = 50
 
 
@@ -91,7 +91,7 @@ def overwrite_with_chunk(filepath, fragment, fragment_size_percent):
     full_fragment_len = len(fragment)
     max_offset = full_fragment_len - fragment_len
     #print(max_offset)
-    fragment_start_pos = random.randrange(0, max_offset)
+    fragment_start_pos = 0 #random.randrange(0, max_offset)
     fragment_stop_pos = fragment_start_pos + fragment_len
 
     #choose random offset in file
@@ -181,15 +181,15 @@ if __name__ == '__main__':
     training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH)
     training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
     training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_training_{}_pdf_ssdeep.csv".format("25k"))
-    list_to_csv(training_normal_hashes, "dataset/normal_hashes_training_{}_pdf_ssdeep.csv".format("25k"))
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_training_{}_pdf_tlsh.csv".format("25000"))
+    list_to_csv(training_normal_hashes, "dataset/normal_hashes_training_{}_pdf_tlsh.csv".format("25000"))
 
     
     test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH)
     test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
     test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_test_{}_pdf_ssdeep.csv".format("2500"))
-    list_to_csv(training_normal_hashes, "dataset/normal_hashes_test_{}_pdf_ssdeep.csv".format("2500"))
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_test_{}_pdf_tlsh.csv".format("2500"))
+    list_to_csv(training_normal_hashes, "dataset/normal_hashes_test_{}_pdf_tlsh.csv".format("2500"))
 
 
 
