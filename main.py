@@ -10,12 +10,13 @@ import csv
 
 
 DATASET_FILETYPE = "pdf"
-TRAINING_DATASET_SIZE = 50000
+TRAINING_DATASET_SIZE = 100000
 TEST_DATASET_SIZE = 5000
 TEST_DATA_FILES_PATH = "../napierone"
 SAMPLE_FILES_PATH = "../govdocs/all_files"
 HASHING_ALGORITHM = "TLSH"
-FRAGMENT_PERCENTAGE = 50
+MAX_FRAGMENT_PERCENTAGE = 90
+MIN_FRAGMENT_PERCENTAGE = 10
 
 
 def get_sample_files(tr_dataset_size, filedirectory):
@@ -146,8 +147,10 @@ def generate_dataset(training_dataset_size, path):
 
     ctr = 1
     for path in list_a:
-        #insert fragments into file
-        fragment_filepath = overwrite_with_chunk(path, anomaly, FRAGMENT_PERCENTAGE)
+        #insert fragments into file, the 
+        fragment_size = random.randint(MIN_FRAGMENT_PERCENTAGE,MAX_FRAGMENT_PERCENTAGE)
+        print(fragment_size)
+        fragment_filepath = overwrite_with_chunk(path, anomaly, fragment_size)
         anomaly_files.append(fragment_filepath)
         #print("DATASET GENERATION: {}/{}".format(ctr,TRAINING_DATASET_SIZE))
         ctr += 1
@@ -181,8 +184,8 @@ if __name__ == '__main__':
     training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH)
     training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
     training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_training_{}_pdf_tlsh.csv".format("25000"))
-    list_to_csv(training_normal_hashes, "dataset/normal_hashes_training_{}_pdf_tlsh.csv".format("25000"))
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_training_{}_pdf_tlsh.csv".format("50000"))
+    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_training_{}_pdf_tlsh.csv".format("50000"))
 
     
     test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH)
