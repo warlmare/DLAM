@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from time import sleep
 from progress.bar import Bar
 import pandas as pd
-
+import re
 import csv
 
 
@@ -14,7 +14,7 @@ TRAINING_DATASET_SIZE = 100000
 TEST_DATASET_SIZE = 5000
 TEST_DATA_FILES_PATH = "../napierone"
 SAMPLE_FILES_PATH = "../govdocs/all_files"
-HASHING_ALGORITHM = "TLSH"
+HASHING_ALGORITHM = "MRSHV2"
 MAX_FRAGMENT_PERCENTAGE = 90
 MIN_FRAGMENT_PERCENTAGE = 10
 
@@ -149,7 +149,6 @@ def generate_dataset(training_dataset_size, path):
     for path in list_a:
         #insert fragments into file, the 
         fragment_size = random.randint(MIN_FRAGMENT_PERCENTAGE,MAX_FRAGMENT_PERCENTAGE)
-        print(fragment_size)
         fragment_filepath = overwrite_with_chunk(path, anomaly, fragment_size)
         anomaly_files.append(fragment_filepath)
         #print("DATASET GENERATION: {}/{}".format(ctr,TRAINING_DATASET_SIZE))
@@ -181,18 +180,21 @@ def list_to_csv(list_x, filename):
 
 if __name__ == '__main__':
 
+    train_dataset_split = int(TRAINING_DATASET_SIZE / 2)
+
     training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH)
     training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
     training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_training_{}_pdf_tlsh.csv".format("50000"))
-    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_training_{}_pdf_tlsh.csv".format("50000"))
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_training_{}_pdf_mrshv2.csv".format(train_dataset_split))
+    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_training_{}_pdf_mrshv2.csv".format(train_dataset_split))
 
-    
+    test_dataset_split = int(TEST_DATASET_SIZE / 2)
+
     test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH)
     test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
     test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_test_{}_pdf_tlsh.csv".format("2500"))
-    list_to_csv(training_normal_hashes, "dataset/normal_hashes_test_{}_pdf_tlsh.csv".format("2500"))
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_test_{}_pdf_mrshv2.csv".format(test_dataset_split))
+    list_to_csv(training_normal_hashes, "dataset/normal_hashes_test_{}_pdf_mrshv2.csv".format(test_dataset_split))
 
 
 

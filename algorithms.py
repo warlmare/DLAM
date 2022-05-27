@@ -481,7 +481,73 @@ class SimHash(TextAlgorithm):
                 list += output_str
         return list
 
+class MRSHV2(Algorithm):
 
+    def compare_file_against_file(self, file_a, file_b):
+        '''compares two files and returns their similarity
+        :param file_a: filepath
+        :param file_b: filepath
+        :return: similarity score : int
+        '''
+        #os.chdir("/home/frieder/FRASH2_0/lib/hash_functions")
+
+        result = subprocess.getoutput("./mrsh -f -c {} {} -t 0".format(file_a, file_b))
+
+        try:
+            comparison_output = self.__output_cleaner(result)
+            similarity_score = int(comparison_output.get("similarity_score"))
+        except TypeError:
+            similarity_score = 0
+
+        return similarity_score
+
+    def __output_cleaner(self, output_raw):
+        '''
+        tokenizes a string
+        :return: dict with token <> string
+        '''
+        string_separated = output_raw.split("|")
+        tokens = ["first_file", "second_file", "similarity_score"]
+        output_clean = dict(zip(tokens, string_separated))
+        return output_clean
+
+    def get_filter(self, directory_path):
+
+        # TODO: fix this nasty work around, as filter a list of lists is expected by NIHTestObjectSimilarity()
+        filter_placeholder = []
+        files = os.listdir(directory_path)
+        for file in files:
+            filter_placeholder += [1]
+
+        return directory_path
+
+
+    def compare_file_against_filter(self, directory_path, filepath):
+
+        #os.chdir("/home/frieder/FRASH2_0/lib/hash_functions")
+        # TODO: mrsh-v2 would normally need a "/*" character behind dir-path, but this does not work here, slower now
+        cmd = ["./mrsh", "-f", "-c", filepath, directory_path, "-t", " 0"]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE).stdout.decode('utf-8')
+        output_itr = iter(proc.splitlines())
+
+        result_dict = {}
+
+        for line in output_itr:
+            filename = helper.get_file_name(str(self.__output_cleaner(line).get("second_file")))
+            sim_score = int(self.__output_cleaner(line).get("similarity_score"))
+            result_dict[filename] = sim_score
+
+        return result_dict
+    
+    def get_hash(self, filepath: str) -> str:
+        '''generate a hash from a file
+        
+        :param filepath: path to the file that will be hashed
+        :return: hash as string
+        '''
+        fuzzy_hash = subprocess.getoutput("./mrsh -p {}".format(filepath))
+        return fuzzy_hash
+        
 class MRSHCF(Algorithm):
 
 
@@ -674,9 +740,14 @@ if __name__ == '__main__':
     #os.system("java -cp FbHash/bin/ FbHash.Fbhash") # -fd {} -o Fbhash/hash_a".format(filePath1))
 
 
-    fbhash_instance = FBHASH()
-    result = fbhash_instance.compare_file_against_file(filePath2, filePath2)
+    #fbhash_instance = FBHASH()
+    #result = fbhash_instance.compare_file_against_file(filePath2, filePath2)
+    #print(result)
+
+    mrsh_instance = MRSHV2()
+    result = mrsh_instance.get_hash("./cleanup.sh")
     print(result)
+
 
 
 
