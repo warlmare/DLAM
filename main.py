@@ -1,5 +1,7 @@
 
 import os, random, helper, plotille, numpy as np, random, file_manipulation, csv
+from tabnanny import filename_only
+from pickle import TRUE
 import termplotlib as tpl
 import matplotlib.pyplot as plt
 from time import sleep
@@ -9,15 +11,15 @@ import re
 import csv
 
 
-DATASET_FILETYPE = "pdf"
-TRAINING_DATASET_SIZE = 100000
+DATASET_FILETYPE = "all"
+TRAINING_DATASET_SIZE = 300000 #govdocs currently holds 401498
 TEST_DATASET_SIZE = 5000
 TEST_DATA_FILES_PATH = "../napierone"
 SAMPLE_FILES_PATH = "../govdocs/all_files"
-HASHING_ALGORITHM = "MRSHV2"
+HASHING_ALGORITHM = "SSDEEP"
 MAX_FRAGMENT_PERCENTAGE = 90
-MIN_FRAGMENT_PERCENTAGE = 10
-
+MIN_FRAGMENT_PERCENTAGE = 5
+FRAGMENT_VAR = False # if False than the same fragment is inserted into all files
 
 def get_sample_files(tr_dataset_size, filedirectory):
     '''selects TRAINING_DATASET_SIZE amount of files of DATASET_FILETYPE
@@ -27,10 +29,15 @@ def get_sample_files(tr_dataset_size, filedirectory):
     '''
     filepaths_ext = []
 
-    for file in os.listdir(filedirectory):
-        if file.endswith(DATASET_FILETYPE):
+    if DATASET_FILETYPE == "all":
+        for file in os.listdir(filedirectory):
             filepath = os.path.join(filedirectory, file)
             filepaths_ext.append(filepath)
+    else:
+        for file in os.listdir(filedirectory):
+            if file.endswith(DATASET_FILETYPE):
+                filepath = os.path.join(filedirectory, file)
+                filepaths_ext.append(filepath)
 
 
     filesizes = []
@@ -68,7 +75,8 @@ def get_rand_bytes(byte_length: int):
     :return: byte sequence as byt object
     '''
 
-    random_bytes = random.randbytes(byte_length)
+    random_bytes = os.urandom(byte_length) 
+       
     return random_bytes
 
 
@@ -129,30 +137,41 @@ def split_list(a_list):
 
 def generate_dataset(training_dataset_size, path):
 
+    # calculating how many files have to be injected with an anomaly
+    anomalous_files = int(TRAINING_DATASET_SIZE / 2)
+
     #generating a sample_set of files
     sample_files_paths, max_filesize = get_sample_files(training_dataset_size, path)
 
     #dividing the dataset into two parts
     list_a, normal_files = split_list(sample_files_paths)
 
-    #generating a random sequence of bytes
-    anomaly = get_rand_bytes(max_filesize)
+    # if the fragment is supposed to be the same fragment for every new insertion
+    if FRAGMENT_VAR is False:
+        #generating a random sequence of bytes
+        anomaly = get_rand_bytes(max_filesize)
 
-    # creating a file with only the randomly generated files
-    f = open("./dataset/anomaly", "wb")
-    f.write(anomaly)
-    f.close()
+        # creating a file with only the randomly generated files
+        f = open("./dataset/anomaly", "wb")
+        f.write(anomaly)
+        f.close()
 
     anomaly_files = []
 
-    ctr = 1
+    ctr = 0
     for path in list_a:
+        # if the fragment is supposed to be varied than generate a new fragment for every new insertion
+        file_size = file_manipulation.getfilesize(path)
+        if FRAGMENT_VAR is True:
+            anomaly = get_rand_bytes(file_size)
+
         #insert fragments into file, the 
         fragment_size = random.randint(MIN_FRAGMENT_PERCENTAGE,MAX_FRAGMENT_PERCENTAGE)
         fragment_filepath = overwrite_with_chunk(path, anomaly, fragment_size)
         anomaly_files.append(fragment_filepath)
         #print("DATASET GENERATION: {}/{}".format(ctr,TRAINING_DATASET_SIZE))
         ctr += 1
+        print(f"anomalous files created= {ctr}/{anomalous_files}")
 
 
 
@@ -163,10 +182,15 @@ def generate_hashes_from_dataset(dataset_paths):
     hashes = []
 
     algorithm_instance = helper.get_algorithm(HASHING_ALGORITHM)
+    file_count = len(dataset_paths)
 
+    ctr = 0
     for path in dataset_paths:
         sample_hash = algorithm_instance.get_hash(path)
         hashes.append(sample_hash)
+    
+        ctr += 1 
+        print(f"files hashed= {ctr}/{file_count}")
 
     return hashes
 
@@ -184,19 +208,19 @@ if __name__ == '__main__':
 
     training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH)
     training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_train_val_{}_mixed_singlefragment_ssdeep.csv".format(train_dataset_split))
     training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_training_{}_pdf_mrshv2.csv".format(train_dataset_split))
-    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_training_{}_pdf_mrshv2.csv".format(train_dataset_split))
+    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_train_val_{}_mixed_singlefragment_ssdeep.csv".format(train_dataset_split))
 
     test_dataset_split = int(TEST_DATASET_SIZE / 2)
 
-    test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH)
-    test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
-    test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_test_{}_pdf_mrshv2.csv".format(test_dataset_split))
-    list_to_csv(training_normal_hashes, "dataset/normal_hashes_test_{}_pdf_mrshv2.csv".format(test_dataset_split))
+    #test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH)
+    #test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
+    #test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
+    #list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_test_{}_pdf_mrshv2.csv".format(test_dataset_split))
+    #list_to_csv(training_normal_hashes, "dataset/normal_hashes_test_{}_pdf_mrshv2.csv".format(test_dataset_split))
 
-
+# to check filetypes and counts find . -type f | sed -n 's/..*\.//p' | sort | uniq -c
 
 
 
