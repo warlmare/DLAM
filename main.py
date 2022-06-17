@@ -11,14 +11,14 @@ import re
 import csv
 
 
-DATASET_FILETYPE = "all"
-TRAINING_DATASET_SIZE = 300000 #govdocs currently holds 401498
-TEST_DATASET_SIZE = 5000
+DATASET_FILETYPE = "js"
+TRAINING_DATASET_SIZE = 100000 #govdocs currently holds 401498
+TEST_DATASET_SIZE = 3000
 TEST_DATA_FILES_PATH = "../napierone"
-SAMPLE_FILES_PATH = "../govdocs/all_files"
+SAMPLE_FILES_PATH = "../javascript_corpus/data" #"../govdocs/all_files"
 HASHING_ALGORITHM = "SSDEEP"
-MAX_FRAGMENT_PERCENTAGE = 90
-MIN_FRAGMENT_PERCENTAGE = 5
+MAX_FRAGMENT_PERCENTAGE = 99
+MIN_FRAGMENT_PERCENTAGE = 1
 FRAGMENT_VAR = False # if False than the same fragment is inserted into all files
 
 def get_sample_files(tr_dataset_size, filedirectory):
@@ -135,7 +135,7 @@ def split_list(a_list):
     half = len(a_list)//2
     return a_list[:half], a_list[half:]
 
-def generate_dataset(training_dataset_size, path):
+def generate_dataset(training_dataset_size, path, min_fragment_size, max_fragment_size):
 
     # calculating how many files have to be injected with an anomaly
     anomalous_files = int(TRAINING_DATASET_SIZE / 2)
@@ -166,7 +166,7 @@ def generate_dataset(training_dataset_size, path):
             anomaly = get_rand_bytes(file_size)
 
         #insert fragments into file, the 
-        fragment_size = random.randint(MIN_FRAGMENT_PERCENTAGE,MAX_FRAGMENT_PERCENTAGE)
+        fragment_size = random.randint(min_fragment_size,max_fragment_size)
         fragment_filepath = overwrite_with_chunk(path, anomaly, fragment_size)
         anomaly_files.append(fragment_filepath)
         #print("DATASET GENERATION: {}/{}".format(ctr,TRAINING_DATASET_SIZE))
@@ -204,25 +204,31 @@ def list_to_csv(list_x, filename):
 
 if __name__ == '__main__':
 
-    train_dataset_split = int(TRAINING_DATASET_SIZE / 2)
+    #train_dataset_split = int(TRAINING_DATASET_SIZE / 2)
 
-    training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH)
-    training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_train_val_{}_mixed_singlefragment_ssdeep.csv".format(train_dataset_split))
-    training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
-    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_train_val_{}_mixed_singlefragment_ssdeep.csv".format(train_dataset_split))
+    #training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH, MIN_FRAGMENT_PERCENTAGE, MAX_FRAGMENT_PERCENTAGE)
+    #training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
+    #list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_1-99_js_ssdeep_jscorpus.csv".format(train_dataset_split))
+    #training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
+    #list_to_csv(training_normal_hashes,  "dataset/normal_hashes_{}_singlefragment_1-99_js_ssdeep_jscorpus.csv".format(train_dataset_split))
 
     test_dataset_split = int(TEST_DATASET_SIZE / 2)
 
-    #test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH)
-    #test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
-    #test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
-    #list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_test_{}_pdf_mrshv2.csv".format(test_dataset_split))
-    #list_to_csv(training_normal_hashes, "dataset/normal_hashes_test_{}_pdf_mrshv2.csv".format(test_dataset_split))
+    test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH, 1, 5)
+    test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
+    test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
+    list_to_csv(test_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_5-10perc_js_ssdeep_napierone.csv".format(test_dataset_split))
+    list_to_csv(test_normal_hashes, "dataset/normal_hashes_{}_singlefragment_5-10perc_js_ssdeep_napierone.csv".format(test_dataset_split))
 
 # to check filetypes and counts find . -type f | sed -n 's/..*\.//p' | sort | uniq -c
+# find . -type f -size -50c
+
+# delete file smaller than 50 bytes
+#find . -type f -size -50c -delete
 
 
+# count files with a particular extension 
+#ls -lR /path/to/dir/*.jpg | wc -l
 
 
 

@@ -19,7 +19,12 @@ import matplotlib.pyplot as plt
 import random 
 import wandb
 import sys
+from nltk import ngrams
+from string import ascii_lowercase, ascii_uppercase
+from itertools import product
+from itertools import islice
 
+from main import TRAINING_DATASET_SIZE
 
 
 # because mrshv2 produces very large hashes
@@ -79,6 +84,21 @@ def clean_mrshv2_hash(mrshv2_hash):
 
     return hash_without_newline_char
 
+def window(seq, n=3):
+    "Returns a sliding window (of width n) over data from the iterable"
+    "   s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ...                   "
+    it = iter(seq)
+    result = tuple(islice(it, n))
+    if len(result) == n:
+        yield result    
+    for elem in it:
+        result = result[1:] + (elem,)
+        yield result
+
+def n_grammer(raw_hash):
+  res_list = ["".join(x) for x in window(raw_hash, 3)]
+  return res_list
+
 ################
 # HASH DATASET #
 ################
@@ -89,19 +109,30 @@ ALL_CHARS += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 ALL_CHARS += '123456789'
 ALL_CHARS += '().,-/+=&$?@#!*:;_[]|%⸏{}\"\'' + ' ' + '\\'
 
+# generate an alphabet for 3-grams, special for tlsh which only uses numbers and uppercase letters
+tlsh_chars =  'ABCDEFGHIJKLMNOPQRSTUVWXYZ' + '0123456789' 
+tlsh_alphabet = [''.join(i) for i in product(tlsh_chars, repeat = 3)]
+
+
 class HashDataset(Dataset):
 
-    def __init__(self, hashes, labels, all_chars, transform=False):
+    def __init__(self, hashes, labels, all_chars, hashing_algorithm='tlsh', transform=False):
         """
         .
         """
+
         super(HashDataset, self).__init__()
 
         self._vocab_size = len(all_chars)
 
         #changed the enumerator to start at 1 s.t. 0 can be padding token 
-        self.char_to_int = dict((c, i) for i, c in enumerate(all_chars, 1))
-        self.int_to_char = dict((i, c) for i, c in enumerate(all_chars, 1))
+        #if hashing_algorithm == "tlsh":  
+        self.char_to_int = dict((c, i) for i, c in enumerate(all_chars))
+        self.int_to_char = dict((i, c) for i, c in enumerate(all_chars))
+        #else:
+        #self.char_to_int = dict((c, i) for i, c in enumerate(all_chars, 1))
+        #self.int_to_char = dict((i, c) for i, c in enumerate(all_chars, 1))
+
 
         self.hashes = hashes
         self.labels = labels
@@ -109,6 +140,10 @@ class HashDataset(Dataset):
         self.transform = transform
 
         self.data_min = 0
+
+#        if hashing_algorithm == "tlsh":
+#          self.data_max = len(tlsh_alphabet)
+#        else:
         self.data_max = len(all_chars)
 
     def __len__(self):
@@ -118,9 +153,16 @@ class HashDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
+        #if hashing_algorithm == "tlsh":
+          # the n-grams are in nested lists 
+          # self.hashes[idx] = ['XC3', '235', '13C', ... ]
         inputs = [self.char_to_int[char] for char in self.hashes[idx]]
+        #else:
+        #  inputs = [self.char_to_int[char] for char in self.hashes[idx]]
+        
         label = torch.LongTensor(self.labels[idx])
 
+        # Does this transform really make sense?
         if self.transform:
             inputs_scaled = inputs / self.data_max
             return torch.FloatTensor(inputs_scaled), label
@@ -128,7 +170,10 @@ class HashDataset(Dataset):
             return torch.LongTensor(inputs), label
 
     def decode_hash(self, encoded_hash):
-        return ''.join(self.int_to_char[_int] for _int in encoded_hash)
+#        if hashing_algorithm == "tlsh":
+ #         return ''.join(self.int_to_ngram[_int] for _int in encoded_hash)
+  #      else:
+          return ''.join(self.int_to_char[_int] for _int in encoded_hash)
 
     @property
     def vocab_size(self):
@@ -141,51 +186,60 @@ class HashDataset(Dataset):
 
 hashing_algorithm = "ssdeep"
 
-anomalies_path = "dataset/anomaly_hashes_train_val_150000_mixed_singlefragment_ssdeep.csv"
-normal_path = "dataset/normal_hashes_train_val_150000_mixed_singlefragment_ssdeep.csv"
+anomalies_path = "dataset/anomaly_hashes_50000_singlefragment_1-99_js_ssdeep_jscorpus.csv"
+normal_path = "dataset/normal_hashes_50000_singlefragment_1-99_js_ssdeep_jscorpus.csv"
 
 # set training dataset size here
-dataset_size = 300000
+dataset_size = 100000
 
 # test data is not validation data! 
 
-#test_anomalies_path = "dataset/anomaly_hashes_test_2500_pdf_ssdeep.csv"
-#test_normal_path = "dataset/normal_hashes_test_2500_pdf_ssdeep.csv"
+test_anomalies_path = "dataset/anomaly_hashes_1500_singlefragment_5-10perc_js_ssdeep_napierone.csv"
+test_normal_path = "dataset/normal_hashes_1500_singlefragment_5-10perc_js_ssdeep_napierone.csv"
 
 #set validation dataset size here
-#test_dataset_size = 5000
+test_dataset_size = 3000
 
 #####################################
 # TRAINING & VALIDATION DATA LOADER #
 #####################################
 
-# splits dataset into two equal parts for training and validation
-dataset_split = int((dataset_size / 2)/2 )
+train_set_size = int((dataset_size * 0.85) / 2) 
+val_set_size = int((dataset_size * 0.15) /2)
+
 
 data_normal = read_csv_to_list(normal_path)
 data_anom = read_csv_to_list(anomalies_path)
+
+
+data_complete_list = data_normal + data_anom
 
 # shuffle the data lists, sample returns a new shuffle list and the original one remains intact
 data_normal = random.sample(data_normal, len(data_normal))
 data_anom =  random.sample(data_anom, len(data_anom))
 
 #take first half of the data for our validation data
-val_data_normal = data_normal[dataset_split:]
-val_data_anom = data_anom[dataset_split:]
+val_data_normal = data_normal[0:val_set_size]
+val_data_anom = data_anom[0:val_set_size]
 
 #Take last half of the data for our training data
-training_data_normal = data_normal[:dataset_split]
-training_data_anom = data_anom[:dataset_split]
+training_data_normal =  data_normal[-train_set_size:]
+training_data_anom = data_anom[-train_set_size:]
 
-# TRAINING DATA
 
 training_data_list = training_data_normal + training_data_anom
+
+
 
 # cleanup all ssdeep hashes (delete first two chars) and mrshv2 (delete newline char and unneccesary information)
 if hashing_algorithm == "ssdeep":
   training_data_list = list(map(clean_ssdeep_hash, training_data_list))
+  data_complete_list = list(map(clean_ssdeep_hash, data_complete_list ))
 elif hashing_algorithm == "mrshv2":
-  training_data_list = list(map(clean_mrshv2_hash, training_data_list)) 
+  training_data_list = list(map(clean_mrshv2_hash, training_data_list))
+  data_complete_list = list(map(clean_mrshv2_hash, data_complete_list )) 
+#elif hashing_algorithm == "tlsh":
+#   training_data_list = list(map(n_grammer, training_data_list))
 
 n_training = len(training_data_list)
 
@@ -195,7 +249,7 @@ training_labels = [[0]] * (n_training // 2) + [[1]] * (n_training // 2)
 train_dataset = HashDataset(
     hashes=training_data_list,
     labels=training_labels,
-    all_chars=ALL_CHARS
+    all_chars=ALL_CHARS #tlsh_alphabet if hashing_algorithm == "tlsh" else ALL_CHARS
 )
 
 # VALIDATION DATA
@@ -206,7 +260,9 @@ val_data_list = val_data_normal + val_data_anom
 if hashing_algorithm == "ssdeep":
   val_data_list = list(map(clean_ssdeep_hash, val_data_list))
 elif hashing_algorithm == "mrshv2":
-  val_data_list = list(map(clean_mrshv2_hash, val_data_list)) 
+  val_data_list = list(map(clean_mrshv2_hash, val_data_list))
+#elif hashing_algorithm == "tlsh":
+#   val_data_list = list(map(n_grammer, val_data_list)) 
 
 n_val = len(val_data_list)
 
@@ -216,49 +272,53 @@ val_labels = [[0]] * (n_val // 2) + [[1]] * (n_val // 2)
 val_dataset = HashDataset(
     hashes=val_data_list,
     labels=val_labels,
-    all_chars=ALL_CHARS
+    all_chars=ALL_CHARS #tlsh_alphabet if hashing_algorithm == "tlsh" else ALL_CHARS
 )
 
-max_hash_length = max([len(hash) for hash in train_dataset.hashes])
-dataset_size = len(train_dataset)
+
+
+max_hash_length = max([len(hash) for hash in data_complete_list])#train_dataset.hashes])
+#dataset_size = len(train_dataset)
 vocabulary_size = train_dataset.vocab_size
 input_size = vocabulary_size
 
-training_sample_lengths =[len(t) for t in training_data_list]
-max_training_sample_length = max(training_sample_lengths)
+#training_sample_lengths =[len(t) for t in training_data_list]
+#max_training_sample_length = max(training_sample_lengths)
 
 
+print("training dataset: ",len(training_data_list)," validation dataset: ", len(val_data_list))
 ##########################
 #     TEST DATA LOADER   #
 ##########################
 
-# These files represent spefically created test files that the models accuracy is tested on 
-
-# test_dataset_split = int(test_dataset_size / 2)
-
-# test_data_normal = read_csv_to_list(test_normal_path)
-# test_data_anom = read_csv_to_list(test_anomalies_path)
-
-# test_data_list = random.sample(test_data_normal, test_dataset_split) + random.sample(test_data_anom, test_dataset_split)
-
-# # cleanup all ssdeep hashes (delete first two chars) and mrshv2 (delete newline char and unneccesary information)
-# if hashing_algorithm == "ssdeep":
-#   test_data_list = list(map(clean_ssdeep_hash, test_data_list))
-# elif hashing_algorithm == "mrshv2":
-#   test_data_list = list(map(clean_mrshv2_hash, test_data_list)) 
-
-# n_test = len(test_data_list)
-
-# test_labels = [[0]] * (n_test // 2) + [[1]] * (n_test // 2)
-
-# test_dataset = HashDataset(
-#     hashes=test_data_list,
-#     labels=test_labels,
-#     all_chars=ALL_CHARS
-# )
+#These files represent spefically created test files that the models accuracy is tested on 
 
 
+#fragment_size = 5,10
+test_dataset_split = int(test_dataset_size / 2)
 
+test_data_normal = read_csv_to_list(test_normal_path)
+test_data_anom = read_csv_to_list(test_anomalies_path)
+
+test_data_list = random.sample(test_data_normal, test_dataset_split) + random.sample(test_data_anom, test_dataset_split)
+
+# cleanup all ssdeep hashes (delete first two chars) and mrshv2 (delete newline char and unneccesary information)
+if hashing_algorithm == "ssdeep":
+  test_data_list = list(map(clean_ssdeep_hash, test_data_list))
+elif hashing_algorithm == "mrshv2":
+  test_data_list = list(map(clean_mrshv2_hash, test_data_list)) 
+
+n_test = len(test_data_list)
+
+test_labels = [[0]] * (n_test // 2) + [[1]] * (n_test // 2)
+
+test_dataset = HashDataset(
+    hashes=test_data_list,
+    labels=test_labels,
+    all_chars=ALL_CHARS
+)
+
+print("test dataset: ", len(test_data_list))
 
 #######################
 # PADDING & COLLATING #
@@ -282,21 +342,20 @@ def simple_collate_fn(data):
 # TRAINING PARAMETERS #
 #######################
 
-print_every = 50 
+print_every = 50
 
 seed = 42
 torch.manual_seed(seed)
 np.random.seed(seed)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
 gpu_ct = torch.cuda.device_count()     
 print(f'GPU devices: {gpu_ct}')
 
-max_steps =  10000
+max_steps =  1500 # 1230 3 epochs for 210000 training data and 1024 batch size
 learning_rate = 1e-3 #1e-6 #1e-3 --> recommended
-batch_size =   512 #1024 for mrshv2 bigger batchsize creates a memory issue
-hidden_size = 768 #128
+batch_size =   1024 #1024 for mrshv2 bigger batchsize creates a memory issue
+hidden_size = 312 #312 #128
 
 ##############
 # BERT MODEL #
@@ -313,9 +372,9 @@ class BERTModel(nn.Module):
 
         # config for a tiny BERT, could be bigger
         config = BertConfig(hidden_size=hidden_size, 
-                            intermediate_size=3072, #512
+                            intermediate_size=1200, #512
                             num_attention_heads=12, #2
-                            num_hidden_layers=12,    #2
+                            num_hidden_layers=4,    #2
                             max_position_embeddings=max_seq_len,
                             vocab_size=vocab_size) 
 
@@ -361,17 +420,18 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 # padding is only used for ssdeep & mrshv2 hashing all other algorithms  produce fixed length hashes 
 if hashing_algorithm == "ssdeep" or hashing_algorithm == "mrshv2":
   train_data_loader = DataLoader(train_dataset, batch_size, collate_fn=simple_collate_fn, shuffle=True, num_workers=2)
-  #test_data_loader = DataLoader(test_dataset, batch_size, collate_fn=simple_collate_fn, shuffle=True, num_workers=2)
+  test_data_loader = DataLoader(test_dataset, batch_size, collate_fn=simple_collate_fn, shuffle=True, num_workers=2)
   val_data_loader = DataLoader(val_dataset, batch_size, collate_fn=simple_collate_fn, shuffle=True, num_workers=2)
 else:
   train_data_loader = DataLoader(train_dataset, batch_size, shuffle=True, num_workers=2)
-  #test_data_loader = DataLoader(test_dataset, batch_size, shuffle=True, num_workers=2)
+  test_data_loader = DataLoader(test_dataset, batch_size, shuffle=True, num_workers=2)
   val_data_loader = DataLoader(val_dataset, batch_size, shuffle=True, num_workers=2)
 
 train_loader_generator = iter(train_data_loader)
-#test_loader_generator = iter(test_data_loader)
+test_loader_generator = iter(test_data_loader)
 val_loader_generator = iter(val_data_loader)
 
+#print(train_dataset[1][0])
 ######################
 # MAIN TRAINING LOOP #
 ###################### 
@@ -380,7 +440,8 @@ total_training_loss = []
 total_validation_loss = []
 total_val_acc = []
 iters = []
-avg_accuracy = 0 
+overall_accuracy = 0 
+overall_loss =0
 ctr = 0
 
 #weights an biases initialization
@@ -426,6 +487,8 @@ for step in range(max_steps):
 
     # LOSS
     loss = criterion(prediction_logits, batch_labels.view(-1))
+    overall_loss += loss
+    avg_loss = (overall_loss / ctr)
     
     optimizer.zero_grad()
 
@@ -454,6 +517,8 @@ for step in range(max_steps):
     # checking the number of equal values in labels and predictions
     correct_predictions = (val_batch_labels == argmax_predictions).sum().cpu().numpy()
     val_acc = (correct_predictions / val_prediction_logits.shape[0]) 
+    overall_accuracy += val_acc
+    avg_accuracy = ( overall_accuracy / ctr)
 
     # LOGGING
     train_loss = loss.cpu().detach().numpy()
@@ -470,7 +535,7 @@ for step in range(max_steps):
     #wandb.log(metrics)
 
     if step % print_every == 0:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}], Step= {step}/{max_steps}, Loss= {loss}, Val Loss={val_loss}, Val Acc={val_acc}")
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}], Step= {step}/{max_steps}, Loss= {loss:.3f}, Val Loss={val_loss:.3f}, Val Acc={val_acc:.3f}, Avg Loss={avg_loss:.3f}, Avg Acc={avg_accuracy:.3f}")
 
 #wandb.finish()
 
@@ -484,6 +549,7 @@ plt.plot(iters, total_val_acc, label = "validation accuracy")
 plt.legend(loc="upper right")
 plt.title("training loss rate (batch_size={}, lr={}, hash={})".format(batch_size,learning_rate,hashing_algorithm))
 plt.show()
+
 
 ########################
 # TEST DATA EVALUATION #
@@ -543,7 +609,7 @@ def test(loader_generator, data_loader, dataset_size):
 
 
 
-test(val_loader_generator, val_data_loader, 2000)
+test(test_loader_generator, test_data_loader, 300)
 
 
 
