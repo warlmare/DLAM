@@ -16,10 +16,12 @@ TRAINING_DATASET_SIZE = 100000 #govdocs currently holds 401498
 TEST_DATASET_SIZE = 3000
 TEST_DATA_FILES_PATH = "../napierone"
 SAMPLE_FILES_PATH = "../javascript_corpus/data" #"../govdocs/all_files"
-HASHING_ALGORITHM = "SSDEEP"
+HASHING_ALGORITHM = "NILSIMSA"
 MAX_FRAGMENT_PERCENTAGE = 99
 MIN_FRAGMENT_PERCENTAGE = 1
 FRAGMENT_VAR = False # if False than the same fragment is inserted into all files
+FRAGMENT_SCRAMBLE_BOOL = False # if True than the fragment is rearranged 
+FRAGMENT_SCRAMBLE_PERC = 0.10 # The anomalie will be cut in equal parts of size .._SCRAMBLE_PERC which will be mixed up 
 
 def get_sample_files(tr_dataset_size, filedirectory):
     '''selects TRAINING_DATASET_SIZE amount of files of DATASET_FILETYPE
@@ -109,6 +111,8 @@ def overwrite_with_chunk(filepath, fragment, fragment_size_percent):
     #cut fragment_len from random pos in file
     fragment_ins = fragment[fragment_start_pos:fragment_stop_pos]
 
+    # if 
+
     # end is where the chunk ends and the second half begins
     end = offset + fragment_len
     f = open(filepath, "rb")
@@ -135,7 +139,7 @@ def split_list(a_list):
     half = len(a_list)//2
     return a_list[:half], a_list[half:]
 
-def generate_dataset(training_dataset_size, path, min_fragment_size, max_fragment_size):
+def generate_dataset(training_dataset_size, path, min_fragment_size, max_fragment_size, generate_new_anomaly_flag):
 
     # calculating how many files have to be injected with an anomaly
     anomalous_files = int(TRAINING_DATASET_SIZE / 2)
@@ -148,13 +152,19 @@ def generate_dataset(training_dataset_size, path, min_fragment_size, max_fragmen
 
     # if the fragment is supposed to be the same fragment for every new insertion
     if FRAGMENT_VAR is False:
-        #generating a random sequence of bytes
-        anomaly = get_rand_bytes(max_filesize)
+        
+        # if generating a new anomaly is wished otherwise read an exisiting one
+        if generate_new_anomaly_flag is True:
+            anomaly = get_rand_bytes(max_filesize)
 
-        # creating a file with only the randomly generated files
-        f = open("./dataset/anomaly", "wb")
-        f.write(anomaly)
-        f.close()
+            # creating a file with only the randomly generated files
+            f = open("./dataset/anomaly", "wb")
+            f.write(anomaly)
+            f.close()
+        else:
+            f = open("./dataset/anomaly", "rb")
+            anomaly = f.read()
+            f.close()
 
     anomaly_files = []
 
@@ -164,6 +174,18 @@ def generate_dataset(training_dataset_size, path, min_fragment_size, max_fragmen
         file_size = file_manipulation.getfilesize(path)
         if FRAGMENT_VAR is True:
             anomaly = get_rand_bytes(file_size)
+
+        if FRAGMENT_SCRAMBLE_BOOL is True:
+            # if the fragment is supposed to be polymorphus i. e. be cut up in equal parts of x that are rearranged
+
+            chunk_size = int(len(anomaly) * FRAGMENT_SCRAMBLE_PERC)
+            #list[bytes] is created
+            bytes_list = [anomaly[i:i+chunk_size] for i in range(0, len(anomaly), chunk_size)]
+
+            # the list[bytes] of the anomaly are shuffled 
+            bytes_list_shuffled = random.sample(bytes_list, len(bytes_list))
+            anomaly = b''.join(bytes_list_shuffled)
+
 
         #insert fragments into file, the 
         fragment_size = random.randint(min_fragment_size,max_fragment_size)
@@ -204,21 +226,21 @@ def list_to_csv(list_x, filename):
 
 if __name__ == '__main__':
 
-    #train_dataset_split = int(TRAINING_DATASET_SIZE / 2)
+    train_dataset_split = int(TRAINING_DATASET_SIZE / 2)
 
-    #training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH, MIN_FRAGMENT_PERCENTAGE, MAX_FRAGMENT_PERCENTAGE)
-    #training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
-    #list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_1-99_js_ssdeep_jscorpus.csv".format(train_dataset_split))
-    #training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
-    #list_to_csv(training_normal_hashes,  "dataset/normal_hashes_{}_singlefragment_1-99_js_ssdeep_jscorpus.csv".format(train_dataset_split))
+    training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH, MIN_FRAGMENT_PERCENTAGE, MAX_FRAGMENT_PERCENTAGE, True)
+    training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_1-99_js_nilsimsa_jscorpus.csv".format(train_dataset_split))
+    training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
+    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_{}_singlefragment_1-99_js_nilsimsa_jscorpus.csv".format(train_dataset_split))
 
     test_dataset_split = int(TEST_DATASET_SIZE / 2)
 
-    test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH, 1, 5)
+    test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH, 5, 15, False)
     test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
     test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
-    list_to_csv(test_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_5-10perc_js_ssdeep_napierone.csv".format(test_dataset_split))
-    list_to_csv(test_normal_hashes, "dataset/normal_hashes_{}_singlefragment_5-10perc_js_ssdeep_napierone.csv".format(test_dataset_split))
+    list_to_csv(test_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_5_15_perc_js_nilsimsa_napierone.csv".format(test_dataset_split))
+    list_to_csv(test_normal_hashes, "dataset/normal_hashes_{}_singlefragment_5_15_perc_js_nilsimsa_napierone.csv".format(test_dataset_split))
 
 # to check filetypes and counts find . -type f | sed -n 's/..*\.//p' | sort | uniq -c
 # find . -type f -size -50c
@@ -232,5 +254,5 @@ if __name__ == '__main__':
 
 
 
-
+#find dataset/anomalies/ -name '*.js' | xargs rm
 

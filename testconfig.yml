@@ -1,0 +1,12 @@
+# YAML Document starts with ---
+# Comments start with #
+---
+Fuzzy_hashing_algorithms: 
+        - SSDEEP
+        - MRSHV2
+Path_to_testfiles: deprecated_models/
+Test_description: mixed files with a fragment between 5 and 10 percent
+
+
+
+

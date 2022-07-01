@@ -1,9 +1,11 @@
+from hmac import compare_digest
 import os
 
 import ssdeep
 
 import nltk
 import tlsh
+from torch import from_file
 
 nltk.download('punkt')
 from simhash import Simhash
@@ -16,6 +18,8 @@ import os
 import errno
 import pathlib
 import pprint
+import sys
+from nilsimsa import Nilsimsa, compare_digests
 
 
 
@@ -73,6 +77,57 @@ class TextAlgorithm:
         text = open(filepath).read()
         return text
 
+
+class NILSIMSA(Algorithm):
+
+    def compare_file_against_file(self, filepath_a, filepath_b):
+        """takes two filepaths, hashes the files 
+        and compares them with one another. Returns
+        a similarity score (0 - 128).        
+        
+        :param filepath_a: 
+        :param filepath_b:
+        """
+
+        file_1_byt = open(filepath_a, "rb")
+        hash_1 = Nilsimsa(file_1_byt.read())
+        file_1_byt.close()
+
+        file_2_byt = open(filepath_b, "rb")
+        hash_2 = Nilsimsa(file_2_byt.read())
+        file_2_byt.close()
+
+        score = compare_digests(hash_1.hexdigest(), hash_2.hexdigest())
+        return score 
+
+    def get_hash(self, filepath: str) -> str:
+        """
+        generates hash from a file
+
+        :param filepath: path to file that will be hashed
+        :return: hash as string
+        """
+
+        file_byt = open(filepath, "rb")
+        hash = Nilsimsa(file_byt.read())
+        file_byt.close()
+
+        fuzzy_hash = hash.hexdigest()
+        return fuzzy_hash
+
+
+    def compare_hash(self, hash1 : str, hash2 : str) -> int:
+        """
+        takes to hash.hexdigest()'S and compares them to return
+        a similiarity score
+
+        :param hash1: hash string
+        :param hash2: hash string
+        :return similarity score: int score (0-128) 
+        """    
+
+        sim_score = compare_digests(hash1, hash2)
+        return sim_score
 
 class SSDEEP(Algorithm):
 
@@ -547,6 +602,10 @@ class MRSHV2(Algorithm):
         '''
         fuzzy_hash = subprocess.getoutput("./mrsh -p {}".format(filepath))
         return fuzzy_hash
+
+
+
+    
         
 class MRSHCF(Algorithm):
 
@@ -589,6 +648,7 @@ class MRSHCF(Algorithm):
         hash_size = helper.getfilesize("./mrsh-cf/mrsh.sig")
         return hash_size
 
+    # TODO: this function needs to be reworked
     def compare_hash(self, filepath):
         '''
         compares a hash against a hash
@@ -744,10 +804,12 @@ if __name__ == '__main__':
     #result = fbhash_instance.compare_file_against_file(filePath2, filePath2)
     #print(result)
 
-    mrsh_instance = MRSHV2()
-    result = mrsh_instance.get_hash("./cleanup.sh")
+    nilsimsa_instance = NILSIMSA()
+    result = nilsimsa_instance.compare_file_against_file("./cleanup.sh","./cleanup.sh" )
     print(result)
-
+    print(nilsimsa_instance.get_hash("./cleanup.sh"))
+    print(nilsimsa_instance.get_hash("./model.py"))
+    print(nilsimsa_instance.get_hash("./helper.py"))
 
 
 
