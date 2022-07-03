@@ -546,7 +546,8 @@ class MRSHV2(Algorithm):
         '''
         #os.chdir("/home/frieder/FRASH2_0/lib/hash_functions")
 
-        result = subprocess.getoutput("./mrsh -f -c {} {} -t 0".format(file_a, file_b))
+        #result = subprocess.getoutput("./mrsh -f -c {} {} -t 0".format(file_a, file_b))
+        result = subprocess.getoutput("./mrsh -c {} {} -t 0".format(file_a, file_b))
 
         try:
             comparison_output = self.__output_cleaner(result)
@@ -617,7 +618,7 @@ class MRSHCF(Algorithm):
         :param file2: filepath
         :return: sim_score (Chunks Detected / Total Chunks) * 100 -> pre-decimal points
         '''
-
+        os.chdir(os.getcwd())
         comparison_output = self.compare_file_against_file_tokenized(file2, file1)
         chunks_total = comparison_output.get("total_chunks")
         chunks_detected = comparison_output.get("chunks_detected")
@@ -660,7 +661,7 @@ class MRSHCF(Algorithm):
         placeholder = self.compare_file_against_file_console(filepath, filepath)
 
     def compare_file_against_file_tokenized(self, file1, file2):
-        os.chdir("/home/frieder/FRASH2_0/lib/hash_functions")
+        os.chdir(os.getcwd())
         output_raw = subprocess.getoutput("./mrsh-cf/mrsh_cuckoo.exe -f {} -c {}".format(file1, file2))
         output = self.output_cleaner_file_vs_file(output_raw)
         return output
@@ -804,12 +805,12 @@ if __name__ == '__main__':
     #result = fbhash_instance.compare_file_against_file(filePath2, filePath2)
     #print(result)
 
-    nilsimsa_instance = NILSIMSA()
-    result = nilsimsa_instance.compare_file_against_file("./cleanup.sh","./cleanup.sh" )
+    mrshcf_instance = MRSHCF()
+    result = mrshcf_instance.compare_file_against_file("cleanup.sh","cleanup.sh" )
     print(result)
-    print(nilsimsa_instance.get_hash("./cleanup.sh"))
-    print(nilsimsa_instance.get_hash("./model.py"))
-    print(nilsimsa_instance.get_hash("./helper.py"))
+    #print(mrshcf_instance.get_hash("./cleanup.sh"))
+    #print(mrshcf_instance.get_hash("./model.py"))
+    #print(mrshcf_instance.get_hash("./helper.py"))
 
 
 

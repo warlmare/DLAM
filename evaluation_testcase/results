@@ -1,0 +1,64 @@
+mrshv2 -> mit -t mode
+
+                      MRSHV2
+tp_ctr                    17
+avg_tp_size   2550574.529412
+avg_tp_score        1.588235
+fp_ctr                     0
+avg_fp_size                0
+avg_fp_score               0
+tn_ctr                   500
+avg_tn_size       349477.652
+avg_tn_score             0.0
+fn_ctr                   483
+avg_fn_size    192133.333333
+avg_fn_score             0.0
+accuracy               0.517
+precision          29.411765
+recall                 0.034
+
+
+mrshv2 -> ohne -t mode
+
+                     MRSHV2
+tp_ctr                  253
+avg_tp_size   590625.758893
+avg_tp_score      10.201581
+fp_ctr                    6
+avg_fp_size    45389.833333
+avg_fp_score       5.166667
+tn_ctr                  494
+avg_tn_size   279857.275304
+avg_tn_score            0.0
+fn_ctr                  247
+avg_fn_size    44275.421053
+avg_fn_score            0.0
+accuracy              0.747
+precision          1.907336
+recall                0.506
+
+
+mit random generierten Dateien , 100000 mit anomalie zwischen 1 und 99 %
+
+                      NILSIMSA        SSDEEP        MRSHV2          TLSH        MRSHCF
+tp_ctr                    4649          2028          3545          3135          4350
+avg_tp_size       30862.449989  44094.616864  32622.964175  41287.660606  32877.931954
+avg_tp_score         29.614326     54.269724     43.237518     38.847953     26.786207
+avg_tp_fragments     54.299634    124.476824     71.209873     80.522807     58.031954
+fp_ctr                    2293             0             1          2475             0
+avg_fp_size       30287.517226             0        1253.0  44876.849697             0
+avg_fp_score          6.601832             0          13.0     19.560135             0
+avg_fp_fragments    253.978631             0      409651.0    235.328889             0
+tn_ctr                    2707          5000          4999          2525          5000
+avg_tn_size       30048.136313    30157.9164   30163.69854  15730.447129    30157.9164
+avg_tn_score          -5.98116           0.0           0.0           0.0           0.0
+avg_tn_fragments    215.160325      116.4878    116.511102    230.642772      116.4878
+fn_ctr                     350          2971          1454          1864           649
+avg_fn_size       22254.202857  20816.094918  24498.000688  11712.277361  12711.089368
+avg_fn_score         -4.085714           0.0           0.0           0.0           0.0
+avg_fn_fragments    718.628571     84.945473    173.531637     135.39324    388.298921
+--------------------------------------------------------------------------------------
+accuracy              0.735674       0.70287      0.854485      0.566057      0.935094
+--------------------------------------------------------------------------------------
+precision             0.389945      2.465483      1.409757      0.450089      1.149425
+recall                0.929986      0.405681      0.709142      0.627125      0.870174

@@ -186,19 +186,11 @@ class HashDataset(Dataset):
 
 hashing_algorithm = "ssdeep"
 
-anomalies_path = "dataset/anomaly_hashes_50000_singlefragment_1-99_js_ssdeep_jscorpus.csv"
-normal_path = "dataset/normal_hashes_50000_singlefragment_1-99_js_ssdeep_jscorpus.csv"
+anomalies_path = "dataset/anomaly_hashes_50000_singlefragment_1-99_ssdeep_pdf_60KB.csv"
+normal_path = "dataset/normal_hashes_50000_singlefragment_1-99_ssdeep_pdf_60KB.csv"
 
 # set training dataset size here
 dataset_size = 100000
-
-# test data is not validation data! 
-
-test_anomalies_path = "dataset/anomaly_hashes_1500_singlefragment_5-10perc_js_ssdeep_napierone.csv"
-test_normal_path = "dataset/normal_hashes_1500_singlefragment_5-10perc_js_ssdeep_napierone.csv"
-
-#set validation dataset size here
-test_dataset_size = 3000
 
 #####################################
 # TRAINING & VALIDATION DATA LOADER #
@@ -293,8 +285,14 @@ print("training dataset: ",len(training_data_list)," validation dataset: ", len(
 
 #These files represent spefically created test files that the models accuracy is tested on 
 
+# test data is not validation data! 
 
-#fragment_size = 5,10
+test_anomalies_path = "dataset/anomaly_hashes_50000_singlefragment_1-99_ssdeep_pdf_60KB.csv"
+test_normal_path = "dataset/normal_hashes_50000_singlefragment_1-99_ssdeep_pdf_60KB.csv"
+
+#set validation dataset size here
+test_dataset_size = 3000
+
 test_dataset_split = int(test_dataset_size / 2)
 
 test_data_normal = read_csv_to_list(test_normal_path)
@@ -319,6 +317,9 @@ test_dataset = HashDataset(
 )
 
 print("test dataset: ", len(test_data_list))
+
+
+
 
 #######################
 # PADDING & COLLATING #
@@ -551,6 +552,9 @@ plt.title("training loss rate (batch_size={}, lr={}, hash={})".format(batch_size
 plt.show()
 
 
+print(max_hash_length) #= max_seq_len
+print(hidden_size)
+print(vocabulary_size)
 ########################
 # TEST DATA EVALUATION #
 ########################
@@ -609,7 +613,7 @@ def test(loader_generator, data_loader, dataset_size):
 
 
 
-test(test_loader_generator, test_data_loader, 300)
+test(train_loader_generator, train_data_loader, 300)
 
 
 

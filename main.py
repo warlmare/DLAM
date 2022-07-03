@@ -9,14 +9,15 @@ from progress.bar import Bar
 import pandas as pd
 import re
 import csv
+import shutil
 
 
-DATASET_FILETYPE = "js"
+DATASET_FILETYPE = "pdf"
 TRAINING_DATASET_SIZE = 100000 #govdocs currently holds 401498
 TEST_DATASET_SIZE = 3000
 TEST_DATA_FILES_PATH = "../napierone"
-SAMPLE_FILES_PATH = "../javascript_corpus/data" #"../govdocs/all_files"
-HASHING_ALGORITHM = "NILSIMSA"
+SAMPLE_FILES_PATH =  "../govdocs/all_files" #"../javascript_corpus/data"
+HASHING_ALGORITHM = "SSDEEP"
 MAX_FRAGMENT_PERCENTAGE = 99
 MIN_FRAGMENT_PERCENTAGE = 1
 FRAGMENT_VAR = False # if False than the same fragment is inserted into all files
@@ -35,31 +36,63 @@ def get_sample_files(tr_dataset_size, filedirectory):
         for file in os.listdir(filedirectory):
             filepath = os.path.join(filedirectory, file)
             filepaths_ext.append(filepath)
+# picks a list of files of a certain filetype the maximum_filesize is important for the anomaly_creation
+    elif(DATASET_FILETYPE == "random"):
+        if not os.path.exists("dataset/random_files"):
+            os.mkdir("dataset/random_files")
+        else:
+            shutil.rmtree("dataset/random_files")
+            os.mkdir("dataset/random_files")
+
+        filesizes = []
+
+
+        for i in range(1,TRAINING_DATASET_SIZE):
+
+            # pick a random number between 500 and 60000 bytes (60KB) and generate as many bytes
+            rand_filesize = random.randint(500, 60000)
+
+            # save the filesize, in the end we want to know the biggest filesize
+            filesizes.append(rand_filesize)
+            
+            random_bytes = get_rand_bytes(rand_filesize)
+
+            rand_filename = "random_generated_file_" + str(i)
+
+            rand_filepath = os.path.join("dataset/random_files", rand_filename)
+
+            filepaths_ext.append(rand_filepath)
+
+            f = open(rand_filepath, "wb")
+            f.write(random_bytes)
+            f.close()
+
+        MAX_FILESIZE = max(filesizes)
+        training_files = filepaths_ext
     else:
         for file in os.listdir(filedirectory):
             if file.endswith(DATASET_FILETYPE):
                 filepath = os.path.join(filedirectory, file)
                 filepaths_ext.append(filepath)
 
-
-    filesizes = []
-    sample = random.sample(filepaths_ext, tr_dataset_size)
-    for file in sample:
-        filesizes.append(helper.getfilesize(file) / 1000000) # size in MB
+        filesizes = []
+        sample = random.sample(filepaths_ext, tr_dataset_size)
+        for file in sample:
+            filesizes.append(helper.getfilesize(file) / 1000000) # size in MB
 
 
 
     #converting array to numpy array
-    filesizes = np.asarray(filesizes    )   #ataset_size = np.sum(filesizes)
-    MAX_FILESIZE = np.max(filesizes) * 1000000
-    #print("-" * 50, "FILESIZE DISTRIBUTION IN SAMPLE", "-" * 50)
-    #print(plotille.histogram(filesizes, x_min=0, x_max=MAX_FILESIZE, y_min=0, y_max=TRAINING_DATASET_SIZE/2, X_label="Size in MB"))
-    #print("DATASET SIZE: ", TRAINING_DATASET_SIZE, " MB")
-    #print("-" * 131)
+        filesizes = np.asarray(filesizes)   #ataset_size = np.sum(filesizes)
+        MAX_FILESIZE = np.max(filesizes) * 1000000
+        #print("-" * 50, "FILESIZE DISTRIBUTION IN SAMPLE", "-" * 50)
+        #print(plotille.histogram(filesizes, x_min=0, x_max=MAX_FILESIZE, y_min=0, y_max=TRAINING_DATASET_SIZE/2, X_label="Size in MB"))
+        #print("DATASET SIZE: ", TRAINING_DATASET_SIZE, " MB")
+        #print("-" * 131)
 
 
-    filepaths_all = random.sample(filepaths_ext, tr_dataset_size)
-    training_files = random.sample(filepaths_all, tr_dataset_size)
+        filepaths_all = random.sample(filepaths_ext, tr_dataset_size)
+        training_files = random.sample(filepaths_all, tr_dataset_size)
     # stores the difference of the list for training files and all files
     #rest_list = []
 
@@ -230,17 +263,17 @@ if __name__ == '__main__':
 
     training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH, MIN_FRAGMENT_PERCENTAGE, MAX_FRAGMENT_PERCENTAGE, True)
     training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files)
-    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_1-99_js_nilsimsa_jscorpus.csv".format(train_dataset_split))
+    list_to_csv(training_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_1-99_ssdeep_pdf_60KB.csv".format(train_dataset_split))
     training_normal_hashes = generate_hashes_from_dataset(training_normal_files)
-    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_{}_singlefragment_1-99_js_nilsimsa_jscorpus.csv".format(train_dataset_split))
+    list_to_csv(training_normal_hashes,  "dataset/normal_hashes_{}_singlefragment_1-99_ssdeep_pdf_60KB.csv".format(train_dataset_split))
 
-    test_dataset_split = int(TEST_DATASET_SIZE / 2)
+    # test_dataset_split = int(TEST_DATASET_SIZE / 2)
 
-    test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH, 5, 15, False)
-    test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
-    test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
-    list_to_csv(test_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_5_15_perc_js_nilsimsa_napierone.csv".format(test_dataset_split))
-    list_to_csv(test_normal_hashes, "dataset/normal_hashes_{}_singlefragment_5_15_perc_js_nilsimsa_napierone.csv".format(test_dataset_split))
+    # test_anomaly_files, test_normal_files = generate_dataset(TEST_DATASET_SIZE, TEST_DATA_FILES_PATH, 5, 15, False)
+    # test_anomaly_hashes = generate_hashes_from_dataset(test_anomaly_files)
+    # test_normal_hashes = generate_hashes_from_dataset(test_normal_files)
+    # list_to_csv(test_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_5_15_perc_js_nilsimsa_napierone.csv".format(test_dataset_split))
+    # list_to_csv(test_normal_hashes, "dataset/normal_hashes_{}_singlefragment_5_15_perc_js_nilsimsa_napierone.csv".format(test_dataset_split))
 
 # to check filetypes and counts find . -type f | sed -n 's/..*\.//p' | sort | uniq -c
 # find . -type f -size -50c
