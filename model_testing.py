@@ -211,56 +211,158 @@ class BERTModel(nn.Module):
         output = outputs_per_token.mean(dim=1) 
         
         return self.predictor(output)
-  
 
-# Model
-model = BERTModel(
-    max_seq_len=96,# max_hash_length, #64
-    hidden_size=312, #hidden_size,     #312
-    vocab_size=91 # vocabulary_size   #91
-)
-
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-gpu_ct = torch.cuda.device_count()     
-print(f'GPU devices: {gpu_ct}')
-
-if torch.cuda.device_count() > 1:
-  print("Let's use", torch.cuda.device_count(), "GPUs!")
-  model = nn.DataParallel(model)
-
-model = torch.load("trained_tiny_bert_model_nilsimsa.pth")
-model.eval()
-
-def hash_to_tensor(hash):
-  input_hash_list = [hash]
-  input_label = [[1]]
-  single_instance_dataset = HashDataset(
-    hashes=input_hash_list,
-    labels=input_label,
-    all_chars=ALL_CHARS
-  )
-  return single_instance_dataset
-
-nilsimsa_hash = "befd117eb1136331e651ff29dac4e335b9cd747780b304cd32b7e260074207bf"
-
-single_hash = hash_to_tensor(nilsimsa_hash)[0]
+def hash_to_embedding(fuzzy_hash_algorithm ,raw_hash, label):
+    if fuzzy_hash_algorithm == "SSDEEP":
+        hash = clean_ssdeep_hash(raw_hash)
+    else:
+        hash = raw_hash
+    input_hash_list = [hash]
+    input_label = [[label]]
+    single_instance_dataset = HashDataset(
+        hashes=input_hash_list,
+        labels=input_label,
+        all_chars=ALL_CHARS
+    )
+    return single_instance_dataset#[0]
 
 
-def model_single_prediction(single_embedding):
+def single_input_prediction(single_embedding, model, device):
       custom_loader = DataLoader(single_embedding,1)
       input, label = iter(custom_loader)
       input = input.to(device)
       label = label.to(device)
       softmax_prediction= F.softmax(model(input), dim=1)
       argmax_prediction = torch.argmax(softmax_prediction, dim=1)
-      if argmax_prediction == label: 
-        return True
-        #print("correctly identified")
-      else:
-        return False
-        #print("incorrectly identified")
+
+      # extract the ints from the label-tensor and prediction-tensor
+      ext_label = label.item()
+      ext_pred = argmax_prediction.item()
+
+      if ext_pred == 1 and ext_label == 1: 
+        # tp for when the label is anomaly and the prediction is anomaly
+        return "tp"
+      elif(ext_pred == 1 and ext_label == 0):
+        # fp for the label is "normal" and the predcition is anomaly
+        return "fp"
+      elif(ext_pred == 0 and ext_label == 0):
+        # tn for the label is "normal" and the prediction is "normal"
+        return "tn"
+      elif(ext_pred == 0 and ext_label == 1):
+        return "fn"
+
+
+# model = BERTModel(
+#     max_seq_len=96,
+#     hidden_size=312,
+#     vocab_size=91
+# )
+
+# #print(model.BERT.config)
+
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+# gpu_ct = torch.cuda.device_count()     
+# print(f'GPU devices: {gpu_ct}')
+
+# #if torch.cuda.device_count() > 1:
+# #    print("Let's use", torch.cuda.device_count(), "GPUs!")
+# #model = nn.DataParallel(model)
+
+# model = torch.load("trained_tiny_bert_model_ssdeep.pth")
+# model.eval()
+
+# print(single_input_prediction(test_embedding[0],model))
 
 
 
-model_single_prediction(single_hash)
+def evaluate_dataset_with_model(path_to_pretrained_model,
+                                model_hash,
+                                max_hash_length, 
+                                hidden_size,
+                                vocabulary_size, 
+                                evaluation_dict,
+                                results_dict):
+
+
+    evaluation_hash_name = model_hash + "_MODEL"
+
+    # Model
+    model = BERTModel(
+        max_seq_len=max_hash_length, #96
+        hidden_size=hidden_size,     #312
+        vocab_size=vocabulary_size   #91
+    )
+
+    #print(model.BERT.config)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    gpu_ct = torch.cuda.device_count()     
+    print(f'GPU devices: {gpu_ct}')
+
+    #if torch.cuda.device_count() > 1:
+    #    print("Let's use", torch.cuda.device_count(), "GPUs!")
+    #model = nn.DataParallel(model)
+
+    model = torch.load(path_to_pretrained_model)
+    model.eval()
+
+    ctr = 0
+    tp_ctr = 0
+    fp_ctr = 0
+    tn_ctr = 0
+    fn_ctr = 0
+
+    tp_lst = []
+    fp_lst = []
+    tn_lst = []
+    fn_lst = []
+
+    for testfile in evaluation_dict:
+        if testfile != "anomaly":
+            ctr += 1
+
+            
+
+            # extract the raw hash
+            raw_hash = evaluation_dict[testfile][model_hash]
+
+            if evaluation_dict[testfile]["label"]  == "anomaly":                
+                label = 1
+            else:
+                label = 0 
+
+            hash_embedding = hash_to_embedding(model_hash,raw_hash,label)
+            model_prediction = single_input_prediction(hash_embedding[0],model, device)
+            
+
+            if model_prediction == "tp": 
+                tp_ctr += 1
+                tp_lst.append(testfile)
+            elif model_prediction == "fp":
+                fp_ctr += 1
+                fp_lst.append(testfile)
+            elif model_prediction == "tn":
+                tn_ctr += 1
+                tn_lst.append(testfile)
+            elif model_prediction == "fn":
+                fn_ctr += 1
+                fn_lst.append(testfile) 
+
+    
+    # calculations
+    accuracy = (tp_ctr + tn_ctr) / (tp_ctr + tn_ctr + fp_ctr + fn_ctr)
+    precision = tp_ctr / (tp_ctr + fp_ctr )
+    recall = tp_ctr / (tp_ctr + fn_ctr)
+
+    # fill the results dict that will be turned into evaluation.yml
+    results_dict[evaluation_hash_name] = {}
+    results_dict[evaluation_hash_name]["accuracy"] = accuracy
+    results_dict[evaluation_hash_name]["precision"] = precision
+    results_dict[evaluation_hash_name]["recall"] = recall
+    results_dict[evaluation_hash_name]["tp_files"] = tp_lst
+    results_dict[evaluation_hash_name]["fp_files"] = fp_lst
+    results_dict[evaluation_hash_name]["tn_files"] = tn_lst
+    results_dict[evaluation_hash_name]["fn_files"] = fn_lst
+
+
+    return results_dict

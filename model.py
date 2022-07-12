@@ -184,10 +184,10 @@ class HashDataset(Dataset):
 #  DATASET PARAMETERS  #
 ########################
 
-hashing_algorithm = "ssdeep"
+hashing_algorithm = "tlsh"
 
-anomalies_path = "dataset/anomaly_hashes_50000_singlefragment_1-99_ssdeep_pdf_60KB.csv"
-normal_path = "dataset/normal_hashes_50000_singlefragment_1-99_ssdeep_pdf_60KB.csv"
+anomalies_path = "evaluation_testcase_xlsx/training_data_for_model/anomaly_hashes_50000_singlefragment_1-99_tlsh_xlsx.csv"
+normal_path = "evaluation_testcase_xlsx/training_data_for_model/normal_hashes_50000_singlefragment_1-99_tlsh_xlsx.csv"
 
 # set training dataset size here
 dataset_size = 100000
@@ -227,6 +227,7 @@ training_data_list = training_data_normal + training_data_anom
 if hashing_algorithm == "ssdeep":
   training_data_list = list(map(clean_ssdeep_hash, training_data_list))
   data_complete_list = list(map(clean_ssdeep_hash, data_complete_list ))
+  print("clean")
 elif hashing_algorithm == "mrshv2":
   training_data_list = list(map(clean_mrshv2_hash, training_data_list))
   data_complete_list = list(map(clean_mrshv2_hash, data_complete_list )) 
@@ -287,8 +288,8 @@ print("training dataset: ",len(training_data_list)," validation dataset: ", len(
 
 # test data is not validation data! 
 
-test_anomalies_path = "dataset/anomaly_hashes_50000_singlefragment_1-99_ssdeep_pdf_60KB.csv"
-test_normal_path = "dataset/normal_hashes_50000_singlefragment_1-99_ssdeep_pdf_60KB.csv"
+test_anomalies_path = "dataset/anomaly_hashes_50000_singlefragment_1-99_tlsh_pdf.csv"
+test_normal_path = "dataset/normal_hashes_50000_singlefragment_1-99_tlsh_pdf.csv"
 
 #set validation dataset size here
 test_dataset_size = 3000
@@ -353,7 +354,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 gpu_ct = torch.cuda.device_count()     
 print(f'GPU devices: {gpu_ct}')
 
-max_steps =  1500 # 1230 3 epochs for 210000 training data and 1024 batch size
+max_steps =  1170 # 12 epochs #585 # 6 epochs 1500 # 1230 3 epochs for 210000 training data and 1024 batch size
 learning_rate = 1e-3 #1e-6 #1e-3 --> recommended
 batch_size =   1024 #1024 for mrshv2 bigger batchsize creates a memory issue
 hidden_size = 312 #312 #128
@@ -541,7 +542,7 @@ for step in range(max_steps):
 #wandb.finish()
 
 print('Done training.')
-torch.save(model, "trained_tiny_bert_model_{}.pth".format(hashing_algorithm))
+torch.save(model, "evaluation_testcase_xlsx/trained_tiny_bert_model_{}.pth".format(hashing_algorithm))
 
 #plotting
 plt.plot(iters , total_training_loss, label = "training loss")
@@ -555,11 +556,13 @@ plt.show()
 print(max_hash_length) #= max_seq_len
 print(hidden_size)
 print(vocabulary_size)
+
+
 ########################
 # TEST DATA EVALUATION #
 ########################
 
-model = torch.load("trained_tiny_bert_model_{}.pth".format(hashing_algorithm))
+model = torch.load("evaluation_testcase_xlsx/trained_tiny_bert_model_{}.pth".format(hashing_algorithm))
 model.eval()
 
 

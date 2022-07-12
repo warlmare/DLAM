@@ -1,4 +1,6 @@
+from genericpath import exists
 import os, random, helper, plotille, numpy as np, random, file_manipulation, csv
+#from turtle import color
 
 from torch import maximum
 from tabnanny import filename_only
@@ -16,10 +18,15 @@ from yaml.loader import SafeLoader
 from pathlib import Path
 import shutil
 import pathlib
+import model_testing
+
+# For some obscure Reason i need to call the BERTModel here
+from model_testing import BERTModel
+
 
 path_to_testdirectory = os.path.dirname(os.path.abspath(sys.argv[1])) 
 
-def read_yaml_file():
+def read_yaml_file(path_to_file):
     '''reads a yaml file with the test parameters specifying:
 
         Fuzzy_hashing_algorithms: ...
@@ -29,10 +36,9 @@ def read_yaml_file():
     returns a  [ list | dict ]
     
     '''
-    config_path = sys.argv[1]
 
     # Open the file and load the file
-    with open(config_path) as f:
+    with open(path_to_file) as f:
         data = yaml.load(f, Loader=SafeLoader)
         # print(yaml.dump(data))
     
@@ -215,7 +221,7 @@ def generate_testdata(amount_of_files,
         list_of_future_manipulated_files, maximum_file_size = get_sample_files(amount_of_files,path_to_original_files,file_type)
 
 
-    # dividing the dataset into two parts
+    # dividing the dataset into two parts one will be normal the other one will have anomalies
     if split_the_sample_flag is True:
         anomaly_files_paths, normal_files_paths = split_list(list_of_future_manipulated_files)
     elif split_the_sample_flag is False:
@@ -242,7 +248,9 @@ def generate_testdata(amount_of_files,
             f = open(path_to_existing_anomaly, "rb")
             anomaly = f.read()
             f.close()
-        
+
+            anomaly_filepath = os.path.join(path_where_files_will_be_saved + "/anomaly")
+            dataset_files["anomaly"]["filepath"] = shutil.copy(path_to_existing_anomaly, anomaly_filepath) 
 
 
     # for the generation of files with anomalies
@@ -276,9 +284,36 @@ def generate_testdata(amount_of_files,
         fragment_size = random.randint(Fragment_lower_bound,Fragment_upper_bound)
         dataset_files[file_name]["fragment_size"] = fragment_size
         
-        # the path where the manipualted file has been saved
-        fragment_filepath = overwrite_with_chunk(path, anomaly, fragment_size, path_where_files_will_be_saved)
+
+        if duplicate_anomaly_in_file_flag ==True:
+            fragment_max = int(100/duplication_ctr)
+            fragment_size = random.randint(Fragment_lower_bound,fragment_max)
+
+
+            fragment_filepath = overwrite_with_chunk(path, anomaly, fragment_size, path_where_files_will_be_saved)
+            for i in range(0,duplication_ctr - 1): 
+                fragment_filepath = overwrite_with_chunk(fragment_filepath, anomaly, fragment_size, path_where_files_will_be_saved)
+        #TODO: FIX THIS MESS
+        else:
+            # the path where the manipualted file has been saved
+            fragment_filepath = overwrite_with_chunk(path, anomaly, fragment_size, path_where_files_will_be_saved)
         
+        # flag is true when the file is supposed to be concatenated with itself a known bane of fuzzy hashing
+        if duplicate_manipulated_file_flag ==True:
+
+                f = open(fragment_filepath, "rb")
+                manipulated_file_bytes = f.read()
+                f.close()
+
+                # concatenate file bytes
+                for _ in range(duplication_ctr):
+                    manipulated_file_bytes += manipulated_file_bytes
+                    print(len(manipulated_file_bytes))
+
+                f = open(fragment_filepath,"wb")
+                f.write(manipulated_file_bytes)
+                f.close()
+
         dataset_files[file_name]["filepath"] = fragment_filepath
         dataset_files[file_name]["label"] = "anomaly"
 
@@ -496,7 +531,7 @@ def precision_and_recall_calculation(testfile_data_dict):
                         evaluation_result[fuzzy_hash]["total_{}_score".format(tag)] = 0
                         evaluation_result[fuzzy_hash]["avg_{}_size".format(tag)] = 0
                         evaluation_result[fuzzy_hash]["avg_{}_score".format(tag)] = 0
-                        evaluation_result[fuzzy_hash]["{}_paths".format(tag)] = []
+                        evaluation_result[fuzzy_hash]["{}_files".format(tag)] = []
                         evaluation_result[fuzzy_hash]["{}_fragments".format(tag)] = 0
                         evaluation_result[fuzzy_hash]["avg_{}_fragments".format(tag)] = 0
                     evaluation_result[fuzzy_hash]["accuracy"] = 0
@@ -507,7 +542,7 @@ def precision_and_recall_calculation(testfile_data_dict):
                 evaluation_result[fuzzy_hash]["{}_ctr".format(eval_tag)] += 1
                 evaluation_result[fuzzy_hash]["total_{}_size".format(eval_tag)] += file_size
                 evaluation_result[fuzzy_hash]["total_{}_score".format(eval_tag)]  += sim_score
-                evaluation_result[fuzzy_hash]["{}_paths".format(eval_tag)].append(file_path)
+                evaluation_result[fuzzy_hash]["{}_files".format(eval_tag)].append(testfile)
                 evaluation_result[fuzzy_hash]["{}_fragments".format(tag)] += fragment_size
                 
                 evaluation_result[fuzzy_hash]["avg_{}_size".format(eval_tag)] = \
@@ -533,15 +568,27 @@ def precision_and_recall_calculation(testfile_data_dict):
                 evaluation_result[fuzzy_hash]["accuracy"] = (true_positive + true_negative) / \
                             (true_positive + true_negative + false_positive + false_negative) \
                                 if (true_positive + true_negative + false_positive + false_negative) else 0
-                evaluation_result[fuzzy_hash]["precision"] = (true_negative / \
+                evaluation_result[fuzzy_hash]["precision"] = (true_positive / \
                                                              (true_positive + false_positive)) \
                                                                 if (true_positive + false_positive) else 0
                 evaluation_result[fuzzy_hash]["recall"] = (true_positive / \
                                                 (true_positive + false_negative)) \
                                                 if (true_positive + false_negative) else 0
 
+
+    save_path = path_to_testdirectory + '/evaluation.yml'
+    with open(save_path, "w") as outfile:
+        yaml.dump(evaluation_result, outfile, default_flow_style=False)
+
+    # to print evaluation results: yaml.dump(evaluation_result))
+    return evaluation_result     
+
+
+def results_to_dataframe(results_dict):
+
+    
     # has lots of rows in it that are not necessary
-    intermediate_dataframe = pd.DataFrame.from_dict(evaluation_result)
+    intermediate_dataframe = pd.DataFrame.from_dict(results_dict)
     final_dataframe = pd.DataFrame()
 
 
@@ -566,15 +613,15 @@ def precision_and_recall_calculation(testfile_data_dict):
                                                 ])
 
     # to print evaluation results: yaml.dump(evaluation_result))
-    return evaluation_result , final_dataframe     
-    
+    return final_dataframe     
 
-def config_file_reader():
+def evaluate_with_fuzzy_hashes(path_to_config_file):
 
-    config = read_yaml_file()
+     
+    config = read_yaml_file(path_to_config_file)
 
     testdata_generation_flag = bool(config["Testfilegeneration"]["Active"])
-    evaluation_flag = bool(config["Evaluation"]["Active"])
+    evaluation_flag = bool(config["Fuzzy_Hash_Evaluation"]["Active"])
 
     if testdata_generation_flag == True:
         testdata_protocol = generate_testdata(int(config["Testfilegeneration"]["Amount_of_files"]),
@@ -593,35 +640,199 @@ def config_file_reader():
                                                 bool(config["Testfilegeneration"]["Duplicate_manipulated_file_flag"]),
                                                 int(config["Testfilegeneration"]["Duplication_Counter"]))
         if evaluation_flag == True:
-            algorithms = config["Evaluation"]["Fuzzy_hashing_algorithms"]
+            algorithms = config["Fuzzy_Hash_Evaluation"]["Fuzzy_hashing_algorithms"]
             hashed_data = hash_data(testdata_protocol, algorithms)
             approximate_matching_data = approximate_matching_anomaly_vs_files(hashed_data)
-            evaluation_results, dataframe = precision_and_recall_calculation(approximate_matching_data)
-            save_path = path_to_testdirectory + '/evaluation.yml'
-            with open(save_path, "w") as outfile:
-                yaml.dump(evaluation_results, outfile, default_flow_style=False)
-            print(dataframe)
+            evaluation_results = precision_and_recall_calculation(approximate_matching_data)
+            print(results_to_dataframe(evaluation_results))
     elif testdata_generation_flag == False:
         if evaluation_flag == True:
-            algorithms = config["Evaluation"]["Fuzzy_hashing_algorithms"]
-            labeled_data = config["Evaluation"]["Labeled_data_path"]
-            evaluation_results, dataframe = precision_and_recall_calculation(labeled_data)
-            save_path = path_to_testdirectory + '/evaluation.yml'
-            with open(save_path, "w") as outfile:
-                yaml.dump(evaluation_results, outfile, default_flow_style=False)
-            print(dataframe)
+            algorithms = config["Fuzzy_Hash_Evaluation"]["Fuzzy_hashing_algorithms"]
+            labeled_data = config["Fuzzy_Hash_Evaluation"]["Labeled_data_path"]
+            evaluation_results= precision_and_recall_calculation(labeled_data)
+            print(results_to_dataframe(evaluation_results))
 
     shutil.rmtree(str(config["Testfilegeneration"]["Path_where_generated_files_will_be_saved"]))
-    shutil.rmtree("evaluation_testcase/unmanipulated_random_generated_files")
+    #shutil.rmtree("evaluation_testcase/unmanipulated_random_generated_files")
 
-if __name__ == '__main__':
 
-    config_file_reader()
+def evaluate_with_model(path_to_config_file):
+
+    config = read_yaml_file(path_to_config_file)
+
+    evaluation_flag = bool(config["Model_Evaluation"]["Active"])
+    if evaluation_flag == True:
+
+        # necessary parameters read from the config file
+        path_to_pretrained_model = config["Model_Evaluation"]["Path_to_pretrained_model"]
+        model_hash = config["Model_Evaluation"]["Model_hash"]
+        max_hash_length = config["Model_Evaluation"]["Model_parameters"]["max_hash_len"]
+        hidden_size = config["Model_Evaluation"]["Model_parameters"]["hidden_size"]
+        vocabulary_size = config["Model_Evaluation"]["Model_parameters"]["vocabulary_size"]
+        path_to_results_log = str(config["Model_Evaluation"]["Path_to_results_log"])
+        
+        evaluation_dict = read_yaml_file(path_to_testdirectory + '/labeled_data.yml')
+
+        results_dict = read_yaml_file(path_to_results_log)
+
+
+        #gets called in another module !
+        model_results_dict = model_testing.evaluate_dataset_with_model(
+                                                                        path_to_pretrained_model,
+                                                                        model_hash, 
+                                                                        max_hash_length,
+                                                                        hidden_size,
+                                                                        vocabulary_size,
+                                                                        evaluation_dict,
+                                                                        results_dict) 
+    save_path = path_to_testdirectory + '/evaluation.yml'
+    with open(save_path, "w") as outfile:
+        yaml.dump(model_results_dict, outfile, default_flow_style=False)
+        
+    print(results_to_dataframe(model_results_dict)) 
+
+def visualizer():   
+
+    labeled_data = read_yaml_file(path_to_testdirectory + "/labeled_data.yml")
+    eval_data = read_yaml_file(path_to_testdirectory +"/evaluation.yml")
+
+    tags = ["tp","fp","tn","fn"]
+
+
+    for fuzzy_hash in eval_data:
+
+        tp_ctr = 0
+        fp_ctr = 0
+        tn_ctr = 0
+        fn_ctr = 0
+
+        intermediate_dataframe = pd.DataFrame(columns=["size","classification","fragment_size"])
+
+        for tag in tags:
+
+            if "{}_files".format(tag) in eval_data[fuzzy_hash]:
+                files_list = eval_data[fuzzy_hash]["{}_files".format(tag)]
+
+                for file in files_list:
+                    if file != "anomaly":
+                        filename = file 
+                        filesize = labeled_data[file]["filesize"]
+                        label = labeled_data[file]["label"]
+                        
+                        file_classification = tag
+
+                        if label == "anomaly":  
+                            anomaly_size = labeled_data[file]["fragment_size"]
+                            intermediate_dataframe.loc[filename] = pd.Series({"size":filesize, "classification":file_classification, "fragment_size":anomaly_size })
+                        else: 
+                            anomaly_size = 0 # when the file is not an anomaly
+                        
+
+                        if tag == "tp":
+                            tp_ctr += 1
+                        elif tag == "fp":
+                            fp_ctr += 1
+                        elif tag == "tn":
+                            tn_ctr += 1
+                        elif tag == "fn":
+                            fn_ctr += 1
+
+        accuracy = eval_data[fuzzy_hash]["accuracy"] * 100
+        fpr = ((fp_ctr / (tn_ctr + fn_ctr))* 100) if (tn_ctr + fn_ctr)  else 0
+        fnr = ((fn_ctr / (tp_ctr + fp_ctr))* 100) if (tp_ctr + fp_ctr) else 0 #false negative / positive
+
+
+
+
+        if fuzzy_hash == "SSDEEP_MODEL":
+       
+
+            # size of the anomaly
+            anomaly_filesize = labeled_data["anomaly"]["filesize"]
+
+            df_sorted = intermediate_dataframe.sort_values("fragment_size")
+            df_reduced = df_sorted[(df_sorted["classification"]=="fn")]
+            
+            #number of files under the break-off
+            files_with_anomaly_under_break_off = df_reduced[(df_reduced["fragment_size"]<= 13)]
+            files_with_anomaly_under_break_off_filesize_mean = int(files_with_anomaly_under_break_off["size"].mean())
+            nr_of_files_with_anomaly_under_break_off = len(files_with_anomaly_under_break_off)
+            files_under_break_off_line_in_perc = nr_of_files_with_anomaly_under_break_off / len(df_reduced) * 100
+
+
+            files_with_anomaly_over_break_off = df_reduced[(df_reduced["fragment_size"]> 13)]
+            files_with_anomaly_over_break_off_filesize_mean = int(files_with_anomaly_over_break_off["size"].mean())
+            nr_of_files_with_anomaly_over_break_off = len(files_with_anomaly_over_break_off)
+            files_over_break_off_line_in_perc = nr_of_files_with_anomaly_over_break_off / len(df_reduced) * 100
+
+            #colors = ['r' if (bar == "fn") else "g" if (bar == "fp") else 'grey' for bar in df_reduced['classification']]
+            plt.figure(figsize=(13,4))
+        
+            #colors = ['grey' if (fragment_size < 13) else 'b' for fragment_size in df_reduced['fragment_size']]
+            #labels = ['grey' if (fragment_size < 13) else 'b' for fragment_size in df_reduced['fragment_size']]
+ 
+            t1 = files_with_anomaly_under_break_off
+            t2 = files_with_anomaly_over_break_off
+            #plt.bar(t1.index.values, t1["fragment_size"], color="r", label="anomaly (%) =< ssdeep break-off")
+            plt.bar(t1.index.values, t1["fragment_size"], color="dimgrey", label="anomaly (%) =< ssdeep break-off", width=0.4, align='edge')
+            plt.bar(t2.index.values, t2["fragment_size"], color="maroon", label="anomaly (%) > ssdeep break-off", width=0.4, align='edge')
+
+            
+            
+            plt.tick_params(right = False, labelbottom = False, bottom = False)
+            #plt.axhline(y = 11, color = 'r', linestyle = '-', label="ssdeep break-off")
+            plt.margins(x=0.01)
+
+            plt.legend(loc = 'upper left')
+            plt.xlabel("false negatives")
+            plt.ylabel("size of the anomaly in %")
+            plt.title("Accuracy: {:.2f}, FPR: {:.2f}, FNR: {:.2f}, ".format(accuracy, fpr, fnr)+ 
+                      "files under break-off line: {} ({:.2f}%), files over break-off line: {} ({:.2f}%)".format(
+                        nr_of_files_with_anomaly_under_break_off,
+                        files_under_break_off_line_in_perc,
+                        nr_of_files_with_anomaly_over_break_off,
+                        files_over_break_off_line_in_perc))  
+            plt.tight_layout()       
+            plt.savefig(path_to_testdirectory + "/ssdeep_graph.pdf",format="pdf", dpi=100)
+        
+        elif(fuzzy_hash == "TLSH_MODEL"):
+
+            df_sorted = intermediate_dataframe.sort_values("fragment_size")
+
+            t1 = df_sorted[(df_sorted["classification"]=="tp")]
+            print(tp_ctr)
+            t2 = df_sorted[(df_sorted["classification"]=="fp")]
+            print(fp_ctr)
+            t3 = df_sorted[(df_sorted["classification"]=="tn")]
+            print(tn_ctr)
+            t4 = df_sorted[(df_sorted["classification"]=="fn")]
+            print(fn_ctr)
+
+            plt.bar(t1.index.values, t1["fragment_size"], color="dimgrey", label="tp", width=0.4, align='edge')
+            #plt.bar(t2.index.values, t2["fragment_size"], color="maroon", label="fp", width=0.4, align='edge')
+            #plt.bar(t3.index.values, t3["fragment_size"], color="orange", label="tn", width=0.4, align='edge')
+            plt.bar(t4.index.values, t4["fragment_size"], color="blue", label="fn", width=0.4, align='edge')
+
+            plt.ylabel("size of the anomaly in %")
+            plt.tick_params(right = False, labelbottom = False, bottom = False)
+            plt.savefig(path_to_testdirectory + "/tlsh_graph.png",format="png", dpi=100)
+
+
+
+
+                    
+
+                    
     
 
 
+if __name__ == '__main__':
 
+    config_file_path = sys.argv[1]
 
+    evaluate_with_fuzzy_hashes(config_file_path)
+    evaluate_with_model(config_file_path)
+    visualizer()
 
 
 
