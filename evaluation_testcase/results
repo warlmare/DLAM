@@ -62,3 +62,72 @@ accuracy              0.735674       0.70287      0.854485      0.566057      0.
 --------------------------------------------------------------------------------------
 precision             0.389945      2.465483      1.409757      0.450089      1.149425
 recall                0.929986      0.405681      0.709142      0.627125      0.870174
+
+
+                          MRSHCF             TLSH  TLSH_MODEL
+tp_ctr                      2356                5         NaN
+avg_tp_size        788690.111205       32805479.4         NaN
+avg_tp_score            0.583395        13.733333         NaN
+avg_tp_fragments       52.706282          24464.8         NaN
+fp_ctr                         0                6         NaN
+avg_fp_size                    0  49441731.333333         NaN
+avg_fp_score                   0         9.777778         NaN
+avg_fp_fragments               0     47841.666667         NaN
+tn_ctr                      2500             2494         NaN
+avg_tn_size          997528.2312    880982.433841         NaN
+avg_tn_score                 0.0              0.0         NaN
+avg_tn_fragments        120.6704       120.960706         NaN
+fn_ctr                       144             2495         NaN
+avg_fn_size       3376395.534722    873878.742285         NaN
+avg_fn_score                 0.0              0.0         NaN
+avg_fn_fragments      860.618056         49.76994         NaN
+accuracy                  0.9712           0.4998    0.819400
+precision                    1.0         0.454545    0.924057
+recall                    0.9424            0.002    0.696000
+
+
+mit 3 facher repetition
+
+                      SSDEEP  SSDEEP_MODEL
+tp_ctr                     0           NaN
+avg_tp_size                0           NaN
+avg_tp_score               0           NaN
+avg_tp_fragments           0           NaN
+fp_ctr                     0           NaN
+avg_fp_size                0           NaN
+avg_fp_score               0           NaN
+avg_fp_fragments           0           NaN
+tn_ctr                    50           NaN
+avg_tn_size       1318731.42           NaN
+avg_tn_score             0.0           NaN
+avg_tn_fragments      105.74           NaN
+fn_ctr                    50           NaN
+avg_fn_size        900753.62           NaN
+avg_fn_score             0.0           NaN
+avg_fn_fragments       50.74           NaN
+accuracy                 0.5          0.73
+precision                  0          0.96
+recall                   0.0          0.48
+
+
+
+                          MRSHCF          MRSHV2         SSDEEP             TLSH SSDEEP_MODEL
+tp_ctr                      2363            2291              4                3          NaN
+avg_tp_size        770504.928058   971681.675251    39592565.25  37066166.333333          NaN
+avg_tp_score             0.57182        31.95155           51.0             19.0          NaN
+avg_tp_fragments       5.204401       53.845046       23803.25     27064.666667          NaN
+fp_ctr                         0              39              0                6          NaN
+avg_fp_size                    0    184116.74359              0  48435726.333333          NaN
+avg_fp_score                   0        2.051282              0             10.0          NaN
+avg_fp_fragments               0     6235.051282              0     38847.833333          NaN
+tn_ctr                      2500            2461           2500             2494          NaN
+avg_tn_size         1020891.5944  1034152.146688   1020891.5944    906822.224539          NaN
+avg_tn_score                 0.0             0.0            0.0              0.0          NaN
+avg_tn_fragments         97.3436       98.886225        97.3436        97.577787          NaN
+fn_ctr                       137             209           2496             2497          NaN
+avg_fn_size       3395936.540146   286237.956938  852394.306891    870944.313977          NaN
+avg_fn_score                 0.0             0.0            0.0              0.0          NaN
+avg_fn_fragments      898.189781      590.004785      49.422676        49.402883          NaN
+accuracy                  0.9726          0.9504         0.5008           0.4994        0.941
+precision                    1.0        0.983262            1.0         0.333333     0.962264
+recall                    0.9452          0.9164         0.0016           0.0012        0.918
