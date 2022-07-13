@@ -1,12 +1,13 @@
 from genericpath import exists
 import os, random, helper, plotille, numpy as np, random, file_manipulation, csv
-#from turtle import color
+
 
 from torch import maximum
 from tabnanny import filename_only
 from pickle import TRUE
 import termplotlib as tpl
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from time import sleep
 from progress.bar import Bar
 import pandas as pd
@@ -780,7 +781,7 @@ def visualizer():
             
             
             plt.tick_params(right = False, labelbottom = False, bottom = False)
-            #plt.axhline(y = 11, color = 'r', linestyle = '-', label="ssdeep break-off")
+            plt.axhline(y = 11, color = 'r', linestyle = '-', label="ssdeep break-off 13%")
             plt.margins(x=0.01)
 
             plt.legend(loc = 'upper left')
@@ -791,7 +792,9 @@ def visualizer():
                         nr_of_files_with_anomaly_under_break_off,
                         files_under_break_off_line_in_perc,
                         nr_of_files_with_anomaly_over_break_off,
-                        files_over_break_off_line_in_perc))  
+                        files_over_break_off_line_in_perc) + "\n" +
+                        "false positives: {}, true negatives: {}, true positives {}, false negatives: {}".format(
+                        fp_ctr, tn_ctr, tp_ctr, fn_ctr))  
             plt.tight_layout()       
             plt.savefig(path_to_testdirectory + "/ssdeep_graph.pdf",format="pdf", dpi=100)
         
@@ -799,23 +802,32 @@ def visualizer():
 
             df_sorted = intermediate_dataframe.sort_values("fragment_size")
 
-            t1 = df_sorted[(df_sorted["classification"]=="tp")]
-            print(tp_ctr)
-            t2 = df_sorted[(df_sorted["classification"]=="fp")]
-            print(fp_ctr)
-            t3 = df_sorted[(df_sorted["classification"]=="tn")]
-            print(tn_ctr)
-            t4 = df_sorted[(df_sorted["classification"]=="fn")]
-            print(fn_ctr)
 
-            plt.bar(t1.index.values, t1["fragment_size"], color="dimgrey", label="tp", width=0.4, align='edge')
+            t1 = df_sorted[(df_sorted["classification"]=="tp") | (df_sorted["classification"]=="fn")]
+            t2 = df_sorted[(df_sorted["classification"]=="fp")]
+            #t2 = df_sorted[(df_sorted["classification"]=="fp")]
+            #t3 = df_sorted[(df_sorted["classification"]=="tn")]
+
+
+            colors = ['tab:orange' if (classification == "tp") else 'tab:blue' for classification in t1['classification']]                
+            plt.figure(figsize=(13,4))
+
+            plt.bar(t1.index.values, t1["fragment_size"], color=colors,  width=0.4, align='edge')
             #plt.bar(t2.index.values, t2["fragment_size"], color="maroon", label="fp", width=0.4, align='edge')
             #plt.bar(t3.index.values, t3["fragment_size"], color="orange", label="tn", width=0.4, align='edge')
-            plt.bar(t4.index.values, t4["fragment_size"], color="blue", label="fn", width=0.4, align='edge')
+            #plt.bar(t4.index.values, t4["fragment_size"], color="blue", label="fn", width=0.4)
+        
 
             plt.ylabel("size of the anomaly in %")
+            TP = mpatches.Patch(color="tab:orange", label="true positives")
+            FN = mpatches.Patch(color="tab:blue", label="false negatives")
+            #FN = mpatches.Patch(color="black", label="false negatives")
+            plt.legend(handles=[TP,FN], loc=2)
             plt.tick_params(right = False, labelbottom = False, bottom = False)
-            plt.savefig(path_to_testdirectory + "/tlsh_graph.png",format="png", dpi=100)
+            plt.margins(x=0.01)
+            plt.title("Accuracy: {:.2f}, FPR: {:.2f}, FNR: {:.2f}, false positives: {}, true negatives: {}, true positives {}, false negatives: {}".format(accuracy, fpr, fnr, fp_ctr, tn_ctr, tp_ctr, fn_ctr))
+            plt.tight_layout() 
+            plt.savefig(path_to_testdirectory + "/ssdeep_ex_graph.pdf",format="pdf", dpi=100)
 
 
 
