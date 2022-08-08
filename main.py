@@ -12,11 +12,11 @@ import csv
 import shutil
 
 
-DATASET_FILETYPE = "js"
-TRAINING_DATASET_SIZE = 100000 #govdocs currently holds 401498
+DATASET_FILETYPE = "all"
+TRAINING_DATASET_SIZE = 99999 #govdocs currently holds 401498
 TEST_DATASET_SIZE = 3000
 TEST_DATA_FILES_PATH = "../napierone"
-SAMPLE_FILES_PATH =  "../javascript_corpus/data"#"../govdocs/all_files" #"../javascript_corpus/data"
+SAMPLE_FILES_PATH =  "../mixed_files"#"../govdocs/all_files" #"../javascript_corpus/data"
 HASHING_ALGORITHM = "TLSH"
 MAX_FRAGMENT_PERCENTAGE = 99
 MIN_FRAGMENT_PERCENTAGE = 1
@@ -36,6 +36,17 @@ def get_sample_files(tr_dataset_size, filedirectory):
         for file in os.listdir(filedirectory):
             filepath = os.path.join(filedirectory, file)
             filepaths_ext.append(filepath)
+
+        filesizes = []
+        sample = random.sample(filepaths_ext, tr_dataset_size)
+        for file in sample:
+            filesizes.append(helper.getfilesize(file) / 1000000)
+
+        MAX_FILESIZE = max(filesizes)
+
+        training_files = filepaths_ext
+
+
 # picks a list of files of a certain filetype the maximum_filesize is important for the anomaly_creation
     elif(DATASET_FILETYPE == "random"):
         if not os.path.exists("dataset/random_files"):
@@ -188,7 +199,7 @@ def generate_dataset(training_dataset_size, path, min_fragment_size, max_fragmen
         
         # if generating a new anomaly is wished otherwise read an exisiting one
         if generate_new_anomaly_flag is True:
-            anomaly = get_rand_bytes(max_filesize)
+            anomaly = get_rand_bytes(30000)
 
             # creating a file with only the randomly generated files
             f = open("./dataset/anomaly", "wb")
@@ -247,10 +258,20 @@ def generate_hashes_from_dataset(dataset_paths, hashing_algorithm):
     algorithm_instance = helper.get_algorithm(hashing_algorithm)
     file_count = len(dataset_paths)
 
+
     ctr = 0
     for path in dataset_paths:
-        sample_hash = algorithm_instance.get_hash(path)
-        hashes.append(sample_hash)
+
+        try:
+            sample_hash = algorithm_instance.get_hash(path)
+            hashes.append(sample_hash)
+        except ValueError:
+            os.remove(path)
+        except IOError:
+            continue
+
+
+
     
         ctr += 1 
         print(f"files hashed= {ctr}/{file_count}")
@@ -269,17 +290,18 @@ if __name__ == '__main__':
 
     train_dataset_split = int(TRAINING_DATASET_SIZE / 2)
 
-    training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH, MIN_FRAGMENT_PERCENTAGE, MAX_FRAGMENT_PERCENTAGE, True, "evaluation_testcase_javascript/anomaly")
-
-    training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files,"SSDEEP")
-    list_to_csv(training_anomaly_hashes, "evaluation_testcase_javascript/training_data_for_model/anomaly_hashes_{}_singlefragment_1-99_ssdeep_javascript.csv".format(train_dataset_split))
-    training_normal_hashes = generate_hashes_from_dataset(training_normal_files,"SSDEEP")
-    list_to_csv(training_normal_hashes,  "evaluation_testcase_javascript/training_data_for_model/normal_hashes_{}_singlefragment_1-99_ssdeep_javascript.csv".format(train_dataset_split))
+    training_anomaly_files, training_normal_files = generate_dataset(TRAINING_DATASET_SIZE, SAMPLE_FILES_PATH, MIN_FRAGMENT_PERCENTAGE, MAX_FRAGMENT_PERCENTAGE, True, "evaluation_testcase_mixed/anomaly")
 
     training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files,"TLSH")
-    list_to_csv(training_anomaly_hashes, "evaluation_testcase_javascript/training_data_for_model/anomaly_hashes_{}_singlefragment_1-99_tlsh_javascript.csv".format(train_dataset_split))
+    list_to_csv(training_anomaly_hashes, "evaluation_testcase_mixed/training_data_for_model/anomaly_hashes_{}_singlefragment_1-99_tlsh_mixed.csv".format(train_dataset_split))
     training_normal_hashes = generate_hashes_from_dataset(training_normal_files,"TLSH")
-    list_to_csv(training_normal_hashes,  "evaluation_testcase_javascript/training_data_for_model/normal_hashes_{}_singlefragment_1-99_tlsh_javascript.csv".format(train_dataset_split))
+    list_to_csv(training_normal_hashes,  "evaluation_testcase_mixed/training_data_for_model/normal_hashes_{}_singlefragment_1-99_tlsh_mixed.csv".format(train_dataset_split))
+
+    training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files,"SSDEEP")
+    list_to_csv(training_anomaly_hashes, "evaluation_testcase_mixed/training_data_for_model/anomaly_hashes_{}_singlefragment_1-99_ssdeep_mixed.csv".format(train_dataset_split))
+    training_normal_hashes = generate_hashes_from_dataset(training_normal_files,"SSDEEP")
+    list_to_csv(training_normal_hashes,  "evaluation_testcase_mixed/training_data_for_model/normal_hashes_{}_singlefragment_1-99_ssdeep_mixed.csv".format(train_dataset_split))
+
 
     # training_anomaly_hashes = generate_hashes_from_dataset(training_anomaly_files,"NILSIMSA")
     # list_to_csv(training_anomaly_hashes, "evaluation_testcase_pdf/training_data_for_model/anomaly_hashes_{}_singlefragment_1-99_nilsimsa_pdf.csv".format(train_dataset_split))
@@ -294,17 +316,20 @@ if __name__ == '__main__':
     # list_to_csv(test_anomaly_hashes, "dataset/anomaly_hashes_{}_singlefragment_5_15_perc_js_nilsimsa_napierone.csv".format(test_dataset_split))
     # list_to_csv(test_normal_hashes, "dataset/normal_hashes_{}_singlefragment_5_15_perc_js_nilsimsa_napierone.csv".format(test_dataset_split))
 
-# to check filetypes and counts find . -type f | sed -n 's/..*\.//p' | sort | uniq -c
+# to check filetypes and counts ..
 # find . -type f -size -50c
 
 # delete file smaller than 50 bytes
 #find . -type f -size -50c -delete
 
+#find . -type f | sed -n 's/..*\.//p' | sort | uniq -c
+
 
 # count files with a particular extension 
 #ls -lR /path/to/dir/*.jpg | wc -l
 
-
+#find ../javascript_corpus/data -name '*.js'
 
 #find dataset/anomalies/ -name '*.js' | xargs rm
 
+#find ../govdocs/all_files -type f | sed -n 's/..*\.//p' | sort | uniq -c

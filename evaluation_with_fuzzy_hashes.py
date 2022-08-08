@@ -19,11 +19,12 @@ from yaml.loader import SafeLoader
 from pathlib import Path
 import shutil
 import pathlib
-import model_testing
+import model_testing_transformer
+import model_testing_feedforward
 
 # For some obscure Reason i need to call the BERTModel here
-from model_testing import BERTModel
-
+from model_testing_transformer import BERTModel
+from model_testing_feedforward import SimpleClassificationModel
 
 path_to_testdirectory = os.path.dirname(os.path.abspath(sys.argv[1])) 
 
@@ -217,6 +218,18 @@ def generate_testdata(amount_of_files,
             f.close()
 
         maximum_file_size = max(rand_filesizes)
+    elif(file_type == "mixed"): # jpg js pdf xlxs
+
+        quota = int(amount_of_files / 3)
+
+        # Sorry for this hard 
+        
+        list_of_pdfs,  maximum_file_size_pdfs = get_sample_files(quota,path_to_original_files,"pdf")
+        list_of_xlsx,  maximum_file_size_xlsx = get_sample_files(quota,path_to_original_files,"xlsx")
+        list_of_js,    maximum_file_size_js = get_sample_files(quota,path_to_original_files,"js")
+
+        list_of_future_manipulated_files = list_of_pdfs + list_of_xlsx  + list_of_js 
+        maximum_file_size = max([maximum_file_size_pdfs,maximum_file_size_xlsx,maximum_file_size_js])
 
     else:
         list_of_future_manipulated_files, maximum_file_size = get_sample_files(amount_of_files,path_to_original_files,file_type)
@@ -372,7 +385,12 @@ def hash_data(dataset_files, fuzzy_hashes):
 
             # fuzzy_hash of a file | three hashes do not return hashes as string so write the path to the file instead
             if fuzzy_hash not in ["FBHASH", "MRSHCF", "MRSHV2"]:
-                hash_exp = fuzzy_hash_instance.get_hash(file_path)
+                try:
+                    hash_exp = fuzzy_hash_instance.get_hash(file_path)
+                except ValueError:
+                    print(file_path)
+                   
+
                 dataset_files[testfile][fuzzy_hash] = hash_exp
             else:
                 dataset_files[testfile][fuzzy_hash] = False
@@ -653,7 +671,7 @@ def evaluate_with_fuzzy_hashes(path_to_config_file):
             evaluation_results= precision_and_recall_calculation(labeled_data)
             print(results_to_dataframe(evaluation_results))
 
-    shutil.rmtree(str(config["Testfilegeneration"]["Path_where_generated_files_will_be_saved"]))
+    #shutil.rmtree(str(config["Testfilegeneration"]["Path_where_generated_files_will_be_saved"]))
     #shutil.rmtree("evaluation_testcase/unmanipulated_random_generated_files")
 
 
@@ -663,6 +681,8 @@ def evaluate_with_model(path_to_config_file):
 
     evaluation_flag = bool(config["Model_Evaluation"]["Active"])
     if evaluation_flag == True:
+
+        
 
         # necessary parameters read from the config file
         path_to_pretrained_model = config["Model_Evaluation"]["Path_to_pretrained_model"]
@@ -676,16 +696,30 @@ def evaluate_with_model(path_to_config_file):
 
         results_dict = read_yaml_file(path_to_results_log)
 
+        model_type =  config["Model_Evaluation"]["Model_type"]
 
-        #gets called in another module !
-        model_results_dict = model_testing.evaluate_dataset_with_model(
-                                                                        path_to_pretrained_model,
-                                                                        model_hash, 
-                                                                        max_hash_length,
-                                                                        hidden_size,
-                                                                        vocabulary_size,
-                                                                        evaluation_dict,
-                                                                        results_dict) 
+        if model_type == "transformer":
+            #gets called in another module !
+            model_results_dict = model_testing_transformer.evaluate_dataset_with_model(
+                                                                            path_to_pretrained_model,
+                                                                            model_hash, 
+                                                                            max_hash_length,
+                                                                            hidden_size,
+                                                                            vocabulary_size,
+                                                                            evaluation_dict,
+                                                                            results_dict)
+        elif(model_type == "feedforward"):
+            model_results_dict = model_testing_feedforward.evaluate_dataset_with_model(
+                                                                                        path_to_pretrained_model,
+                                                                                        model_hash,
+                                                                                        max_hash_length,
+                                                                                        hidden_size,
+                                                                                        vocabulary_size,
+                                                                                        evaluation_dict,
+                                                                                        results_dict
+            )                           
+
+
     save_path = path_to_testdirectory + '/evaluation.yml'
     with open(save_path, "w") as outfile:
         yaml.dump(model_results_dict, outfile, default_flow_style=False)
@@ -742,52 +776,62 @@ def visualizer():
         fpr = ((fp_ctr / (tn_ctr + fn_ctr))* 100) if (tn_ctr + fn_ctr)  else 0
         fnr = ((fn_ctr / (tp_ctr + fp_ctr))* 100) if (tp_ctr + fp_ctr) else 0 #false negative / positive
 
+        if fuzzy_hash == "SSDEEP_MODEL_TRANSFORMER" or fuzzy_hash == "TLSH_MODEL_TRANSFORMER"  :
+            model_version = "Transformer"
+        elif(fuzzy_hash == "SSDEEP_MODEL_FEEDFORWARD" or fuzzy_hash == "TLSH_MODEL_FEEDFORWARD"):
+            model_version = "Feedforward"
 
 
-
-        if fuzzy_hash == "SSDEEP_MODEL":
+        if fuzzy_hash == "SSDEEP_MODEL_TRANSFORMER" or fuzzy_hash == "SSDEEP_MODEL_FEEDFORWARD":
        
+
 
             # size of the anomaly
             anomaly_filesize = labeled_data["anomaly"]["filesize"]
 
             df_sorted = intermediate_dataframe.sort_values("fragment_size")
-            df_reduced = df_sorted[(df_sorted["classification"]=="fn")]
+            df_reduced = df_sorted[(df_sorted["classification"]=="fn") | (df_sorted["classification"]=="tp")]
             
             #number of files under the break-off
-            files_with_anomaly_under_break_off = df_reduced[(df_reduced["fragment_size"]<= 13)]
+
+            df_fn = df_sorted[(df_sorted["classification"]=="fn")]
+
+            files_with_anomaly_under_break_off = df_fn[(df_fn["fragment_size"]< 13)]
             files_with_anomaly_under_break_off_filesize_mean = int(files_with_anomaly_under_break_off["size"].mean())
             nr_of_files_with_anomaly_under_break_off = len(files_with_anomaly_under_break_off)
-            files_under_break_off_line_in_perc = nr_of_files_with_anomaly_under_break_off / len(df_reduced) * 100
+            files_under_break_off_line_in_perc = nr_of_files_with_anomaly_under_break_off / len(df_fn) * 100
 
 
-            files_with_anomaly_over_break_off = df_reduced[(df_reduced["fragment_size"]> 13)]
+            files_with_anomaly_over_break_off = df_fn[(df_fn["fragment_size"]>= 13)]
             files_with_anomaly_over_break_off_filesize_mean = int(files_with_anomaly_over_break_off["size"].mean())
             nr_of_files_with_anomaly_over_break_off = len(files_with_anomaly_over_break_off)
-            files_over_break_off_line_in_perc = nr_of_files_with_anomaly_over_break_off / len(df_reduced) * 100
-
-            #colors = ['r' if (bar == "fn") else "g" if (bar == "fp") else 'grey' for bar in df_reduced['classification']]
+            files_over_break_off_line_in_perc = nr_of_files_with_anomaly_over_break_off / len(df_fn) * 100
             plt.figure(figsize=(13,4))
-        
-            #colors = ['grey' if (fragment_size < 13) else 'b' for fragment_size in df_reduced['fragment_size']]
-            #labels = ['grey' if (fragment_size < 13) else 'b' for fragment_size in df_reduced['fragment_size']]
- 
-            t1 = files_with_anomaly_under_break_off
-            t2 = files_with_anomaly_over_break_off
-            #plt.bar(t1.index.values, t1["fragment_size"], color="r", label="anomaly (%) =< ssdeep break-off")
-            plt.bar(t1.index.values, t1["fragment_size"], color="dimgrey", label="anomaly (%) =< ssdeep break-off", width=0.4, align='edge')
-            plt.bar(t2.index.values, t2["fragment_size"], color="maroon", label="anomaly (%) > ssdeep break-off", width=0.4, align='edge')
+    
+            # ---------
+            #t1 = files_with_anomaly_under_break_off
+            #t2 = files_with_anomaly_over_break_off
+            #plt.bar(t1.index.values, t1["fragment_size"], color="dimgrey", label="anomaly (%) =< ssdeep break-off", width=0.4, align='edge')
+            #plt.bar(t2.index.values, t2["fragment_size"], color="maroon", label="anomaly (%) > ssdeep break-off", width=0.4, align='edge')
+            # ---------
+
+            colors = ['tab:orange' if (classification == "tp") else 'tab:blue' for classification in df_reduced['classification']]
+            plt.bar(df_reduced.index.values, df_reduced["fragment_size"], color=colors,  width=0.4, align='edge')
+            TP = mpatches.Patch(color="tab:orange", label="true positives")
+            FN = mpatches.Patch(color="tab:blue", label="false negatives")
+            BR = mpatches.Patch(color="r", label="ssdeep break-off 13%")
+            plt.xlabel("false negatives and true positives")
+            plt.ylabel("size of the anomaly in %")  
+            plt.legend(handles=[TP,FN, BR], loc=2)
 
             
             
             plt.tick_params(right = False, labelbottom = False, bottom = False)
-            plt.axhline(y = 11, color = 'r', linestyle = '-', label="ssdeep break-off 13%")
+
+            plt.axhline(y = 13, color = 'r', linestyle = '-', label="ssdeep break-off 13%")
             plt.margins(x=0.01)
 
-            plt.legend(loc = 'upper left')
-            plt.xlabel("false negatives")
-            plt.ylabel("size of the anomaly in %")
-            plt.title("Accuracy: {:.2f}, FPR: {:.2f}, FNR: {:.2f}, ".format(accuracy, fpr, fnr)+ 
+            plt.title("{} ssdeep, Accuracy: {:.2f} ".format(model_version, accuracy)+ 
                       "files under break-off line: {} ({:.2f}%), files over break-off line: {} ({:.2f}%)".format(
                         nr_of_files_with_anomaly_under_break_off,
                         files_under_break_off_line_in_perc,
@@ -796,15 +840,15 @@ def visualizer():
                         "false positives: {}, true negatives: {}, true positives {}, false negatives: {}".format(
                         fp_ctr, tn_ctr, tp_ctr, fn_ctr))  
             plt.tight_layout()       
-            plt.savefig(path_to_testdirectory + "/ssdeep_graph.pdf",format="pdf", dpi=100)
+            plt.savefig(path_to_testdirectory + "/ssdeep_graph_{}.pdf".format(model_version),format="pdf", dpi=100)
         
-        elif(fuzzy_hash == "TLSH_MODEL"):
+        elif(fuzzy_hash == "TLSH_MODEL_TRANSFORMER" or fuzzy_hash == "TLSH_MODEL_FEEDFORWARD"):
 
             df_sorted = intermediate_dataframe.sort_values("fragment_size")
 
 
             t1 = df_sorted[(df_sorted["classification"]=="tp") | (df_sorted["classification"]=="fn")]
-            t2 = df_sorted[(df_sorted["classification"]=="fp")]
+            #t2 = df_sorted[(df_sorted["classification"]=="fp")]
             #t2 = df_sorted[(df_sorted["classification"]=="fp")]
             #t3 = df_sorted[(df_sorted["classification"]=="tn")]
 
@@ -817,7 +861,7 @@ def visualizer():
             #plt.bar(t3.index.values, t3["fragment_size"], color="orange", label="tn", width=0.4, align='edge')
             #plt.bar(t4.index.values, t4["fragment_size"], color="blue", label="fn", width=0.4)
         
-
+            plt.xlabel("false negatives and true positives")
             plt.ylabel("size of the anomaly in %")
             TP = mpatches.Patch(color="tab:orange", label="true positives")
             FN = mpatches.Patch(color="tab:blue", label="false negatives")
@@ -825,9 +869,10 @@ def visualizer():
             plt.legend(handles=[TP,FN], loc=2)
             plt.tick_params(right = False, labelbottom = False, bottom = False)
             plt.margins(x=0.01)
-            plt.title("Accuracy: {:.2f}, FPR: {:.2f}, FNR: {:.2f}, false positives: {}, true negatives: {}, true positives {}, false negatives: {}".format(accuracy, fpr, fnr, fp_ctr, tn_ctr, tp_ctr, fn_ctr))
-            plt.tight_layout() 
-            plt.savefig(path_to_testdirectory + "/ssdeep_ex_graph.pdf",format="pdf", dpi=100)
+            plt.title("{} TLSH, Accuracy: {:.2f}, false positives: {}, true negatives: {}, true positives {}, false negatives: {}".format(model_version, accuracy, fp_ctr, tn_ctr, tp_ctr, fn_ctr))
+            plt.tight_layout()
+
+            plt.savefig(path_to_testdirectory + "/tlsh_graph_{}.pdf".format(model_version),format="pdf", dpi=100)
 
 
 
