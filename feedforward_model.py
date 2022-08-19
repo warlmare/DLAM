@@ -17,7 +17,7 @@ from pprint import pprint
 
 
 import random 
-import wandb
+#import wandb
 import sys
 from nltk import ngrams
 from string import ascii_lowercase, ascii_uppercase
@@ -35,7 +35,7 @@ csv.field_size_limit(sys.maxsize)
 #######################
 
 # Log in to W&B account, use 
-wandb.login()
+#wandb.login()
 
 #######################
 # AUXILIARY FUNCTIONS #
