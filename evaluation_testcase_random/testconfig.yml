@@ -1,0 +1,76 @@
+# YAML Document starts with ---
+# Comments start with #
+---
+Testfilegeneration:
+        Active: True
+        Amount_of_files: 5000
+        File_type: random
+        Path_to_original_files: ../napierone
+        Path_where_generated_files_will_be_saved: evaluation_testcase_random/testfiles
+        Split_sample_flag: True # Dataset is splitted, half the files will be manipulated
+        Generate_a_new_fragment_for_every_file_flag: False
+        Generate_a_new_fragment_or_use_an_existing_one_flag: False #if False give path to exisiting Fragment
+        Path_to_exisiting_anomaly: evaluation_testcase_random/anomaly # if above is false give path to existing anomaly
+        Shuffle_anomaly_flag: False # if True than the anomaly will be additionally segmented into parts of size X % Which will be shuffled
+        Shuffle_anomaly_parts_in_perc: 0 # ought to be 5% or smth. if above is true
+        Fragment_size: 
+                Lower_bound: 1
+                Upper_bound: 99
+        Duplicate_anomaly_in_file_flag: False # Duplicate the anomaly in the file
+        Duplicate_manipulated_file_flag: False # The manipulate file will be concatenated with itself
+        Duplication_Counter: 4 #How often should the anomaly be concatenated
+Fuzzy_Hash_Evaluation:
+        Active: True
+        Labeled_data_path: evaluation_testcase_random/labeled_data.yml
+        Fuzzy_hashing_algorithms: 
+                #- NILSIMSA
+                - SSDEEP
+                #- MRSHV2               
+                - TLSH
+                #- MRSHCF
+                #- FBHASH
+        Path_to_results_log: evaluation_testcase_random/evaluation.yml
+Model_Evaluation_1:
+        Active: True
+        Model_type: transformer
+        Path_to_results_log: evaluation_testcase_random/evaluation.yml
+        Path_to_pretrained_model: evaluation_testcase_random/transformer_model_tlsh.pth 
+        Model_hash: TLSH
+        Model_parameters:
+                max_hash_len: 72
+                hidden_size: 312
+                vocabulary_size: 1296
+        Model_description: TLSH, PDF, 1-99% anomaly (same as in eval data) has been insertet, govdocs corpus
+Model_Evaluation_2:
+        Active: True
+        Model_type: transformer
+        Path_to_results_log: evaluation_testcase_random/evaluation.yml
+        Path_to_pretrained_model: evaluation_testcase_random/transformer_model_ssdeep.pth 
+        Model_hash: SSDEEP
+        Model_parameters:
+                max_hash_len: 96
+                hidden_size: 312
+                vocabulary_size: 91
+        Model_description: SSDEEP, PDF, 1-99% anomaly (same as in eval data) has been insertet, govdocs corpus
+Model_Evaluation_3:
+        Active: True
+        Model_type: feedforward
+        Path_to_results_log: evaluation_testcase_random/evaluation.yml
+        Path_to_pretrained_model: evaluation_testcase_random/feedforward_model_ssdeep.pth 
+        Model_hash: TLSH
+        Model_parameters:
+                max_hash_len:  72  
+                hidden_size: 128 
+                vocabulary_size: 1296 
+        Model_description: TLSH, PDF, 1-99% anomaly (same as in eval data) has been insertet, govdocs corpus feedforward model
+Model_Evaluation:
+        Active: True
+        Model_type: feedforward
+        Path_to_results_log: evaluation_testcase_random/evaluation.yml
+        Path_to_pretrained_model: evaluation_testcase_random/trained_feedforward_model_ssdeep.pth 
+        Model_hash: SSDEEP
+        Model_parameters:
+                max_hash_len:  96  
+                hidden_size: 128 
+                vocabulary_size: 91 
+        Model_description: SSDEEP, PDF, 1-99% anomaly (same as in eval data) has been insertet, govdocs corpus feedforward model
