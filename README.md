@@ -1,6 +1,10 @@
 
 
-# Transformer-Boosted Anomaly Detection with Fuzzy Hashes
+# Deep Learning assisted approximate matching (DLAM)
+
+this work was presented as the DFRWS USA 2023: https://www.sciencedirect.com/science/article/pii/S2666281723000793?ref=pdf_download&fr=RR-2&rr=7e510f09ec2e58f0
+
+A more comprehensible google Colab notebook will be coming very soon. 
 
 ```
 TLDR; you want to verify the results: 
